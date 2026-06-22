@@ -10,6 +10,8 @@ Aplikasi latihan tes berbasis Streamlit untuk mengasah logika, Swift, OOP, dan k
 - Perbandingan kenaikan/penurunan, nilai rata-rata, dan personal best.
 - Evaluasi section terkuat, section prioritas, serta konsep yang sering salah.
 - Riwayat tes lengkap dengan nilai, jumlah jawaban benar, dan durasi.
+- Detail riwayat tes dapat dibuka ulang untuk melihat soal, jawaban Anda, kunci jawaban, status benar/salah/kosong, dan pembahasan.
+- Sinkronisasi opsional ke Firebase Firestore untuk user, attempt, section, dan detail jawaban.
 - Alur tes lengkap: instruksi, pengerjaan, konfirmasi submit, dan hasil.
 - 100 soal acak per sesi, termasuk 25 soal analisis pseudocode.
 - Tujuh section: Logic, Swift, Analisis Pseudocode, Analisis Kode, Lengkapi Kode, OOP, serta Design & UX.
@@ -47,4 +49,33 @@ scripts/                Generator aset logo PNG
 
 ## Penyimpanan data
 
-Secara default data disimpan pada `data/academy_prep.db`. SQLite cocok untuk penggunaan lokal atau server dengan persistent disk. Untuk deployment publik di layanan yang filesystem-nya sementara, pindahkan database ke PostgreSQL atau Supabase agar akun dan progres tidak hilang saat aplikasi restart.
+Secara default data disimpan pada `data/academy_prep.db`. SQLite tetap menjadi penyimpanan lokal utama agar app bisa jalan tanpa konfigurasi cloud.
+
+## Firebase
+
+Project Firebase yang dipakai: `academyprep-62ae8`.
+
+App ini berbasis Streamlit/Python, jadi integrasi Firebase memakai `firebase-admin`, bukan `npm install firebase`. Konfigurasi web API key dari Firebase Console tidak cukup untuk write server-side yang aman.
+
+Untuk mengaktifkan sinkronisasi Firestore:
+
+1. Buka Firebase Console, pilih project `academyprep-62ae8`.
+2. Masuk ke Project settings > Service accounts.
+3. Generate private key dan simpan file JSON di luar git, misalnya `firebase-service-account.json`.
+4. Set environment variable:
+
+```powershell
+$env:FIREBASE_SERVICE_ACCOUNT_PATH="C:\path\to\firebase-service-account.json"
+$env:FIREBASE_PROJECT_ID="academyprep-62ae8"
+streamlit run app.py
+```
+
+Atau gunakan `.streamlit/secrets.toml`:
+
+```toml
+[firebase]
+project_id = "academyprep-62ae8"
+service_account_path = "C:\\path\\to\\firebase-service-account.json"
+```
+
+Saat kredensial belum dipasang, app tetap menyimpan data ke SQLite dan menampilkan warning bahwa sync Firebase belum aktif. Setelah kredensial aktif, login ke akun akan menyinkronkan user, riwayat tes, section, dan detail jawaban lokal ke Firestore.

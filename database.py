@@ -1,17 +1,27 @@
 import base64
 import hashlib
 import hmac
+import json
 import os
 import re
 import secrets
 import sqlite3
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 
 DB_PATH = Path(os.environ.get("ACADEMY_DB_PATH", "data/academy_prep.db"))
 PASSWORD_ITERATIONS = 600_000
+REMEMBER_TOKEN_DAYS = 30
 EMAIL_PATTERN = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
+ANSWER_RESULT_COLUMNS = {
+    "position": "INTEGER",
+    "difficulty": "TEXT",
+    "code": "TEXT",
+    "language": "TEXT",
+    "explanation": "TEXT",
+    "options_json": "TEXT",
+}
 
 
 def _connect():
@@ -20,6 +30,18 @@ def _connect():
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA foreign_keys = ON")
     return connection
+
+
+def _ensure_answer_result_columns(connection):
+    existing_columns = {
+        row["name"]
+        for row in connection.execute("PRAGMA table_info(answer_results)").fetchall()
+    }
+    for column, definition in ANSWER_RESULT_COLUMNS.items():
+        if column not in existing_columns:
+            connection.execute(
+                f"ALTER TABLE answer_results ADD COLUMN {column} {definition}"
+            )
 
 
 def initialize_database():
@@ -73,12 +95,24 @@ def initialize_database():
                 FOREIGN KEY (attempt_id) REFERENCES attempts(id) ON DELETE CASCADE
             );
 
+            CREATE TABLE IF NOT EXISTS remember_tokens (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                token_hash TEXT NOT NULL UNIQUE,
+                created_at TEXT NOT NULL,
+                expires_at TEXT NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            );
+
             CREATE INDEX IF NOT EXISTS idx_attempts_user
                 ON attempts(user_id, completed_at);
             CREATE INDEX IF NOT EXISTS idx_answers_attempt
                 ON answer_results(attempt_id);
+            CREATE INDEX IF NOT EXISTS idx_remember_tokens_hash
+                ON remember_tokens(token_hash);
             """
         )
+        _ensure_answer_result_columns(connection)
 
 
 def normalize_email(email):
@@ -112,6 +146,10 @@ def _hash_password(password, salt=None):
         base64.b64encode(password_hash).decode("ascii"),
         base64.b64encode(salt).decode("ascii"),
     )
+
+
+def _hash_remember_token(token):
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
 def create_user(name, email, password):
@@ -162,8 +200,65 @@ def authenticate_user(email, password):
     return {"id": row["id"], "name": row["name"], "email": row["email"]}
 
 
+def create_remember_token(user_id):
+    token = secrets.token_urlsafe(32)
+    token_hash = _hash_remember_token(token)
+    now = datetime.now(timezone.utc)
+    expires_at = now + timedelta(days=REMEMBER_TOKEN_DAYS)
+    with _connect() as connection:
+        connection.execute(
+            """
+            INSERT INTO remember_tokens (user_id, token_hash, created_at, expires_at)
+            VALUES (?, ?, ?, ?)
+            """,
+            (user_id, token_hash, now.isoformat(), expires_at.isoformat()),
+        )
+    return token
+
+
+def get_user_by_remember_token(token):
+    if not token:
+        return None
+
+    now = datetime.now(timezone.utc)
+    token_hash = _hash_remember_token(token)
+    with _connect() as connection:
+        row = connection.execute(
+            """
+            SELECT u.id, u.name, u.email, rt.expires_at
+            FROM remember_tokens rt
+            JOIN users u ON u.id = rt.user_id
+            WHERE rt.token_hash = ?
+            """,
+            (token_hash,),
+        ).fetchone()
+
+        if row is None:
+            return None
+
+        expires_at = datetime.fromisoformat(row["expires_at"])
+        if expires_at <= now:
+            connection.execute(
+                "DELETE FROM remember_tokens WHERE token_hash = ?", (token_hash,)
+            )
+            return None
+
+    return {"id": row["id"], "name": row["name"], "email": row["email"]}
+
+
+def revoke_remember_token(token):
+    if not token:
+        return
+    with _connect() as connection:
+        connection.execute(
+            "DELETE FROM remember_tokens WHERE token_hash = ?",
+            (_hash_remember_token(token),),
+        )
+
+
 def save_attempt(user_id, session_key, summary, sections, answers):
     with _connect() as connection:
+        _ensure_answer_result_columns(connection)
         existing = connection.execute(
             "SELECT id FROM attempts WHERE session_key = ?", (session_key,)
         ).fetchone()
@@ -207,8 +302,9 @@ def save_attempt(user_id, session_key, summary, sections, answers):
             """
             INSERT INTO answer_results (
                 attempt_id, section, concept, question, user_answer,
-                correct_answer, is_correct
-            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                correct_answer, is_correct, position, difficulty, code,
+                language, explanation, options_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
                 (
@@ -219,6 +315,12 @@ def save_attempt(user_id, session_key, summary, sections, answers):
                     answer.get("user_answer"),
                     answer["correct_answer"],
                     int(answer["is_correct"]),
+                    answer.get("position"),
+                    answer.get("difficulty"),
+                    answer.get("code"),
+                    answer.get("language"),
+                    answer.get("explanation"),
+                    json.dumps(answer.get("options", []), ensure_ascii=False),
                 )
                 for answer in answers
             ],
@@ -230,7 +332,7 @@ def get_attempts(user_id):
     with _connect() as connection:
         rows = connection.execute(
             """
-            SELECT id, score, correct, incorrect, unanswered, total,
+            SELECT id, session_key, score, correct, incorrect, unanswered, total,
                    duration_seconds, finish_reason, started_at, completed_at
             FROM attempts
             WHERE user_id = ?
@@ -239,6 +341,54 @@ def get_attempts(user_id):
             (user_id,),
         ).fetchall()
     return [dict(row) for row in rows]
+
+
+def get_attempt_sections(user_id, attempt_id):
+    with _connect() as connection:
+        rows = connection.execute(
+            """
+            SELECT sr.section, sr.correct, sr.total
+            FROM section_results sr
+            JOIN attempts a ON a.id = sr.attempt_id
+            WHERE a.user_id = ?
+              AND sr.attempt_id = ?
+            ORDER BY sr.section
+            """,
+            (user_id, attempt_id),
+        ).fetchall()
+    return {
+        row["section"]: {"correct": row["correct"], "total": row["total"]}
+        for row in rows
+    }
+
+
+def get_attempt_answers(user_id, attempt_id):
+    with _connect() as connection:
+        _ensure_answer_result_columns(connection)
+        rows = connection.execute(
+            """
+            SELECT ar.id, ar.position, ar.section, ar.concept, ar.difficulty,
+                   ar.question, ar.code, ar.language, ar.user_answer,
+                   ar.correct_answer, ar.is_correct, ar.explanation,
+                   ar.options_json
+            FROM answer_results ar
+            JOIN attempts a ON a.id = ar.attempt_id
+            WHERE a.user_id = ?
+              AND ar.attempt_id = ?
+            ORDER BY COALESCE(ar.position, ar.id), ar.id
+            """,
+            (user_id, attempt_id),
+        ).fetchall()
+
+    answers = []
+    for row in rows:
+        answer = dict(row)
+        try:
+            answer["options"] = json.loads(answer.pop("options_json") or "[]")
+        except json.JSONDecodeError:
+            answer["options"] = []
+        answers.append(answer)
+    return answers
 
 
 def get_section_performance(user_id):

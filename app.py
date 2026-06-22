@@ -13,13 +13,19 @@ from PIL import Image
 
 from database import (
     authenticate_user,
+    create_remember_token,
     create_user,
+    get_attempt_answers,
+    get_attempt_sections,
     get_attempts,
     get_concept_performance,
     get_section_performance,
+    get_user_by_remember_token,
     initialize_database,
+    revoke_remember_token,
     save_attempt,
 )
+from firebase_service import FirebaseNotConfigured, sync_attempt, sync_user
 from questions import QUESTIONS
 
 
@@ -258,6 +264,21 @@ st.markdown(
         .answer-box.wrong { border-left-color: var(--danger); }
         .answer-label { color: var(--muted); font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; }
         .answer-value { color: #f8fafc; margin-top: .18rem; }
+        .answer-options { display: grid; gap: .5rem; margin-top: .75rem; }
+        .answer-option {
+            border: 1px solid var(--border); border-radius: 11px; padding: .7rem .85rem;
+            background: #0f151e; color: #dce4ee; line-height: 1.45;
+        }
+        .answer-option.correct { border-color: rgba(53, 208, 160, .75); background: rgba(53, 208, 160, .08); }
+        .answer-option.selected.wrong { border-color: rgba(255, 113, 133, .75); background: rgba(255, 113, 133, .08); }
+        .option-tags { display: flex; flex-wrap: wrap; gap: .35rem; margin-bottom: .35rem; }
+        .option-tag {
+            display: inline-flex; align-items: center; min-height: 22px; padding: .15rem .45rem;
+            border-radius: 999px; background: #253041; color: #cbd5e1; font-size: .66rem;
+            font-weight: 750; text-transform: uppercase; letter-spacing: .05em;
+        }
+        .option-tag.correct { background: rgba(53, 208, 160, .16); color: var(--success); }
+        .option-tag.wrong { background: rgba(255, 113, 133, .16); color: var(--danger); }
         .explanation { margin-top: .8rem; padding: .9rem 1rem; border-radius: 11px; background: rgba(83, 120, 255, .08); border: 1px solid rgba(83, 120, 255, .2); }
         .explanation-title { color: #91a8ff; font-size: .76rem; font-weight: 760; margin-bottom: .25rem; }
 
@@ -336,6 +357,7 @@ def start_test():
     st.session_state.finish_reason = None
     st.session_state.attempt_id = None
     st.session_state.persistence_error = None
+    st.session_state.firebase_error = None
     st.session_state.screen = "exam"
 
 
@@ -355,9 +377,84 @@ def set_authenticated_user(user):
 
 
 def logout_user():
+    remember_token = st.session_state.get("remember_token") or get_remember_token()
+    revoke_remember_token(remember_token)
     for key in list(st.session_state.keys()):
         del st.session_state[key]
+    clear_remember_token()
     st.session_state.screen = "auth"
+
+
+def get_remember_token():
+    token = st.query_params.get("remember")
+    if isinstance(token, list):
+        return token[0] if token else None
+    return token
+
+
+def set_remember_token(token):
+    st.session_state.remember_token = token
+    st.query_params["remember"] = token
+
+
+def clear_remember_token():
+    st.session_state.pop("remember_token", None)
+    if "remember" in st.query_params:
+        del st.query_params["remember"]
+
+
+def restore_remembered_user():
+    if st.session_state.get("user"):
+        return False
+
+    remember_token = get_remember_token()
+    user = get_user_by_remember_token(remember_token)
+    if not user:
+        clear_remember_token()
+        return False
+
+    st.session_state.remember_token = remember_token
+    set_authenticated_user(user)
+    return True
+
+
+def sync_local_user_to_firebase(user):
+    sync_user(user)
+    attempts = get_attempts(user["id"])
+    for attempt in attempts:
+        summary = {
+            "score": attempt["score"],
+            "correct": attempt["correct"],
+            "incorrect": attempt["incorrect"],
+            "unanswered": attempt["unanswered"],
+            "total": attempt["total"],
+            "duration_seconds": attempt["duration_seconds"],
+            "finish_reason": attempt["finish_reason"],
+            "started_at": attempt["started_at"],
+            "completed_at": attempt["completed_at"],
+        }
+        sync_attempt(
+            user,
+            attempt["id"],
+            attempt["session_key"],
+            summary,
+            get_attempt_sections(user["id"], attempt["id"]),
+            get_attempt_answers(user["id"], attempt["id"]),
+        )
+
+
+def try_sync_local_user_to_firebase(user):
+    if st.session_state.get("firebase_synced_user_id") == user["id"]:
+        return
+
+    try:
+        sync_local_user_to_firebase(user)
+        st.session_state.firebase_error = None
+        st.session_state.firebase_synced_user_id = user["id"]
+    except FirebaseNotConfigured as error:
+        st.session_state.firebase_error = str(error)
+    except Exception as error:
+        st.session_state.firebase_error = f"Firebase sync gagal: {error}"
 
 
 def persist_current_attempt():
@@ -388,12 +485,18 @@ def persist_current_attempt():
         user_answer = st.session_state.answers.get(index)
         answer_results.append(
             {
+                "position": index + 1,
                 "section": question_data["section_label"],
                 "concept": question.get("concept"),
+                "difficulty": question.get("difficulty"),
                 "question": question["q"],
+                "code": question.get("code"),
+                "language": question.get("language", "swift"),
+                "options": question.get("options", []),
                 "user_answer": user_answer,
                 "correct_answer": question["answer"],
                 "is_correct": user_answer == question["answer"],
+                "explanation": get_explanation(question),
             }
         )
 
@@ -409,6 +512,19 @@ def persist_current_attempt():
             dict(section_results),
             answer_results,
         )
+        try:
+            sync_attempt(
+                st.session_state.user,
+                st.session_state.attempt_id,
+                session_key,
+                summary,
+                dict(section_results),
+                answer_results,
+            )
+        except FirebaseNotConfigured as error:
+            st.session_state.firebase_error = str(error)
+        except Exception as error:
+            st.session_state.firebase_error = f"Firebase sync gagal: {error}"
     except Exception as error:
         st.session_state.persistence_error = str(error)
 
@@ -496,6 +612,173 @@ def get_explanation(question):
     return f"Identifikasi kata kunci konsep pada soal, lalu eliminasi opsi yang definisi atau perilakunya tidak sesuai. Pilihan yang tepat adalah {answer}."
 
 
+def answer_status(user_answer, correct_answer, is_correct=None):
+    if user_answer is None:
+        return "Kosong", "status-empty"
+    if is_correct is None:
+        is_correct = user_answer == correct_answer
+    if bool(is_correct):
+        return "Benar", "status-good"
+    return "Salah", "status-bad"
+
+
+def format_answer_value(value):
+    if value is None:
+        return "Tidak dijawab"
+    if value == "":
+        return "(opsi kosong)"
+    return str(value)
+
+
+def build_current_review_items():
+    review_items = []
+    for index, question_data in enumerate(st.session_state.test_questions):
+        question = question_data["item"]
+        user_answer = st.session_state.answers.get(index)
+        review_items.append(
+            {
+                "position": index + 1,
+                "section": question_data["section_label"],
+                "concept": question.get("concept"),
+                "difficulty": question.get("difficulty"),
+                "question": question["q"],
+                "code": question.get("code"),
+                "language": question.get("language", "swift"),
+                "options": question.get("options", []),
+                "user_answer": user_answer,
+                "correct_answer": question["answer"],
+                "is_correct": user_answer == question["answer"],
+                "explanation": get_explanation(question),
+            }
+        )
+    return review_items
+
+
+def render_answer_options(options, user_answer, correct_answer):
+    if not options:
+        return
+
+    option_blocks = []
+    for option in options:
+        classes = ["answer-option"]
+        tags = []
+        if option == correct_answer:
+            classes.append("correct")
+            tags.append('<span class="option-tag correct">Kunci</span>')
+        if user_answer is not None and option == user_answer:
+            classes.append("selected")
+            if option != correct_answer:
+                classes.append("wrong")
+                tags.append('<span class="option-tag wrong">Jawaban Anda</span>')
+            else:
+                tags.append('<span class="option-tag correct">Jawaban Anda</span>')
+        tag_markup = (
+            f'<div class="option-tags">{"".join(tags)}</div>' if tags else ""
+        )
+        option_blocks.append(
+            f"""
+            <div class="{' '.join(classes)}">
+                {tag_markup}
+                <div>{html.escape(format_answer_value(option))}</div>
+            </div>
+            """
+        )
+
+    st.markdown(
+        f'<div class="answer-options">{"".join(option_blocks)}</div>',
+        unsafe_allow_html=True,
+    )
+
+
+def render_answer_review(review_items, filter_key):
+    review_filter = st.radio(
+        "Filter review",
+        ["Semua", "Salah", "Benar", "Kosong"],
+        index=0,
+        horizontal=True,
+        label_visibility="collapsed",
+        key=filter_key,
+    )
+
+    visible_count = 0
+    for fallback_index, item in enumerate(review_items, start=1):
+        user_answer = item.get("user_answer")
+        correct_answer = item.get("correct_answer")
+        status, status_class = answer_status(
+            user_answer, correct_answer, item.get("is_correct")
+        )
+
+        if review_filter != "Semua" and review_filter != status:
+            continue
+
+        visible_count += 1
+        position = item.get("position") or fallback_index
+        question_text = item.get("question", "")
+        with st.expander(f"{position}. [{status}] {question_text}", expanded=False):
+            meta_parts = [
+                html.escape(str(value))
+                for value in (
+                    item.get("section"),
+                    item.get("difficulty"),
+                    item.get("concept"),
+                )
+                if value
+            ]
+            meta = " &middot; ".join(meta_parts)
+            st.markdown(
+                f'<div class="question-meta">{meta} &middot; <span class="{status_class}">{status}</span></div>',
+                unsafe_allow_html=True,
+            )
+            if item.get("code"):
+                st.code(
+                    item["code"],
+                    language=item.get("language") or "swift",
+                    line_numbers=True,
+                )
+
+            render_answer_options(
+                item.get("options", []), user_answer, correct_answer
+            )
+
+            answer_columns = st.columns(2)
+            with answer_columns[0]:
+                answer_class = "correct" if status == "Benar" else "wrong"
+                st.markdown(
+                    f"""
+                    <div class="answer-box {answer_class}">
+                        <div class="answer-label">Jawaban Anda</div>
+                        <div class="answer-value">{html.escape(format_answer_value(user_answer))}</div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+            with answer_columns[1]:
+                st.markdown(
+                    f"""
+                    <div class="answer-box correct">
+                        <div class="answer-label">Jawaban benar</div>
+                        <div class="answer-value">{html.escape(format_answer_value(correct_answer))}</div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
+            explanation = item.get("explanation")
+            if explanation:
+                st.markdown(
+                    f"""
+                    <div class="explanation">
+                        <div class="explanation-title">Cara menjawab</div>
+                        <div>{html.escape(str(explanation))}</div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
+    if visible_count == 0:
+        st.caption("Tidak ada soal pada filter ini.")
+
+
 def calculate_results():
     total = len(st.session_state.test_questions)
     correct = 0
@@ -577,6 +860,11 @@ def render_auth():
                 with st.form("login_form"):
                     email = st.text_input("Email", placeholder="nama@email.com")
                     password = st.text_input("Password", type="password")
+                    remember_me = st.checkbox(
+                        "Ingat saya di perangkat ini",
+                        value=True,
+                        help="Jangan aktifkan di perangkat publik.",
+                    )
                     submitted = st.form_submit_button(
                         "Masuk", type="primary", width="stretch",
                         disabled=remaining_lock > 0,
@@ -588,6 +876,11 @@ def render_auth():
                     user = authenticate_user(email, password)
                     if user:
                         set_authenticated_user(user)
+                        if remember_me:
+                            set_remember_token(create_remember_token(user["id"]))
+                        else:
+                            clear_remember_token()
+                        try_sync_local_user_to_firebase(user)
                         st.rerun()
                     else:
                         failures = st.session_state.get("login_failures", 0) + 1
@@ -627,6 +920,7 @@ def render_auth():
                             st.error(error)
                         else:
                             set_authenticated_user(user)
+                            try_sync_local_user_to_firebase(user)
                             st.rerun()
                 st.markdown(
                     '<div class="account-note">Password disimpan sebagai hash PBKDF2, bukan teks asli.</div>',
@@ -656,6 +950,7 @@ def render_dashboard():
     user = st.session_state.user
     user_name = html.escape(user["name"])
     render_user_navigation(show_dashboard=False)
+    try_sync_local_user_to_firebase(user)
 
     header_content, start_column = st.columns([4, 1], vertical_alignment="bottom")
     with header_content:
@@ -672,6 +967,9 @@ def render_dashboard():
         if st.button("Mulai Tes Baru", type="primary", width="stretch"):
             return_to_intro()
             st.rerun()
+
+    if st.session_state.get("firebase_error"):
+        st.warning(st.session_state.firebase_error)
 
     attempts = get_attempts(user["id"])
     section_performance = get_section_performance(user["id"])
@@ -718,13 +1016,13 @@ def render_dashboard():
         (str(len(attempts)), "Tes diselesaikan", f"Terakhir {_format_attempt_date(attempts[-1]['completed_at'])}", ""),
     ]
     metric_cards = "".join(
-        f"""
-            <div class="dashboard-card">
-                <div class="dashboard-value">{value}</div>
-                <div class="dashboard-label">{label}</div>
-                <div class="dashboard-detail {detail_class}">{detail}</div>
-            </div>
-        """
+        (
+            f'<div class="dashboard-card">'
+            f'<div class="dashboard-value">{value}</div>'
+            f'<div class="dashboard-label">{label}</div>'
+            f'<div class="dashboard-detail {detail_class}">{detail}</div>'
+            f"</div>"
+        )
         for value, label, detail, detail_class in metrics
     )
     st.markdown(
@@ -841,6 +1139,48 @@ def render_dashboard():
                 }
             )
         st.dataframe(history_rows, hide_index=True, width="stretch")
+
+        st.write("")
+        st.subheader("Detail review percobaan")
+        attempt_options = {
+            f"Tes {number} - {_format_attempt_date(attempt['completed_at'])} - Nilai {attempt['score']:.1f}": attempt
+            for number, attempt in enumerate(attempts, start=1)
+        }
+        selected_label = st.selectbox(
+            "Pilih tes untuk melihat soal dan jawaban",
+            list(attempt_options.keys()),
+            index=len(attempt_options) - 1,
+        )
+        selected_attempt = attempt_options[selected_label]
+
+        detail_columns = st.columns(4)
+        detail_metrics = [
+            (f'{selected_attempt["score"]:.1f}', "Nilai"),
+            (
+                f'{selected_attempt["correct"]}/{selected_attempt["total"]}',
+                "Jawaban benar",
+            ),
+            (selected_attempt["incorrect"], "Jawaban salah"),
+            (selected_attempt["unanswered"], "Tidak dijawab"),
+        ]
+        for column, (value, label) in zip(detail_columns, detail_metrics):
+            with column:
+                st.markdown(
+                    f'<div class="metric-card"><div class="metric-value">{value}</div><div class="metric-label">{label}</div></div>',
+                    unsafe_allow_html=True,
+                )
+
+        selected_answers = get_attempt_answers(user["id"], selected_attempt["id"])
+        if selected_answers:
+            st.caption(
+                "Buka setiap soal untuk melihat pilihan Anda, kunci jawaban, dan pembahasan."
+            )
+            render_answer_review(
+                selected_answers,
+                filter_key=f"history_review_filter_{selected_attempt['id']}",
+            )
+        else:
+            st.info("Detail jawaban untuk percobaan ini belum tersedia.")
 
 
 def render_intro():
@@ -1175,6 +1515,8 @@ def render_results():
         )
     elif st.session_state.get("attempt_id"):
         st.success("Hasil tes sudah disimpan ke progres akun Anda.")
+    if st.session_state.get("firebase_error"):
+        st.warning(st.session_state.firebase_error)
 
     st.write("")
     st.subheader("Nilai per section")
@@ -1206,80 +1548,10 @@ def render_results():
     st.divider()
     st.subheader("Review jawaban")
     st.caption("Buka setiap soal untuk melihat jawaban Anda, jawaban benar, dan cara menyelesaikannya.")
-    review_filter = st.radio(
-        "Filter review",
-        ["Semua", "Salah", "Benar", "Kosong"],
-        index=0,
-        horizontal=True,
-        label_visibility="collapsed",
-        key=f"review_filter_{st.session_state.test_id}",
+    render_answer_review(
+        build_current_review_items(),
+        filter_key=f"review_filter_{st.session_state.test_id}",
     )
-
-    for index, question_data in enumerate(st.session_state.test_questions):
-        question = question_data["item"]
-        user_answer = st.session_state.answers.get(index)
-        if user_answer is None:
-            status, status_class = "Kosong", "status-empty"
-        elif user_answer == question["answer"]:
-            status, status_class = "Benar", "status-good"
-        else:
-            status, status_class = "Salah", "status-bad"
-
-        if review_filter != "Semua" and review_filter != status:
-            continue
-
-        with st.expander(
-            f"{index + 1}. [{status}] {question['q']}",
-            expanded=False,
-        ):
-            st.markdown(
-                f'<div class="question-meta">{question_data["section_label"]} · <span class="{status_class}">{status}</span></div>',
-                unsafe_allow_html=True,
-            )
-            if question.get("code"):
-                st.code(
-                    question["code"],
-                    language=question.get("language", "swift"),
-                    line_numbers=True,
-                )
-            if question.get("difficulty") or question.get("concept"):
-                badges = "".join(
-                    f'<span class="code-badge">{value}</span>'
-                    for value in (question.get("difficulty"), question.get("concept"))
-                    if value
-                )
-                st.markdown(f'<div class="code-context">{badges}</div>', unsafe_allow_html=True)
-            answer_columns = st.columns(2)
-            with answer_columns[0]:
-                answer_class = "correct" if status == "Benar" else "wrong"
-                st.markdown(
-                    f"""
-                    <div class="answer-box {answer_class}">
-                        <div class="answer-label">Jawaban Anda</div>
-                        <div class="answer-value">{user_answer or "Tidak dijawab"}</div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
-            with answer_columns[1]:
-                st.markdown(
-                    f"""
-                    <div class="answer-box correct">
-                        <div class="answer-label">Jawaban benar</div>
-                        <div class="answer-value">{question["answer"]}</div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
-            st.markdown(
-                f"""
-                <div class="explanation">
-                    <div class="explanation-title">Cara menjawab</div>
-                    <div>{get_explanation(question)}</div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
 
 
 initialize_storage()
@@ -1293,6 +1565,8 @@ if "user" not in st.session_state:
     st.session_state.user = None
 if "screen" not in st.session_state:
     st.session_state.screen = "dashboard" if st.session_state.user else "auth"
+if not st.session_state.user:
+    restore_remembered_user()
 if not st.session_state.user:
     st.session_state.screen = "auth"
 

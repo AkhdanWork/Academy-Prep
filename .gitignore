@@ -1,6 +1,8 @@
 __pycache__/
 *.py[cod]
 .streamlit/secrets.toml
+.streamlit/*.json
 data/*.db
 data/*.db-shm
 data/*.db-wal
+firebase-service-account*.json
