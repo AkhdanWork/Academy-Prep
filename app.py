@@ -616,8 +616,8 @@ def try_sync_local_user_to_firebase(user):
         sync_local_user_to_firebase(user)
         st.session_state.firebase_error = None
         st.session_state.firebase_synced_user_id = user["id"]
-    except FirebaseNotConfigured as error:
-        st.session_state.firebase_error = str(error)
+    except FirebaseNotConfigured:
+        st.session_state.firebase_error = None
     except Exception as error:
         st.session_state.firebase_error = f"Firebase sync gagal: {error}"
 
