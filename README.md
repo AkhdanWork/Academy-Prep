@@ -1,6 +1,6 @@
-# Apple Developer Academy — Simulation Test
+# Swift Programming — Simulation Test
 
-Aplikasi latihan tes berbasis Streamlit untuk persiapan seleksi Apple Developer Academy.
+Aplikasi latihan tes berbasis Streamlit untuk mengasah logika, Swift, OOP, dan kemampuan analisis kode.
 
 ## Fitur
 

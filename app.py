@@ -34,7 +34,7 @@ LOGO_DATA_URI = "data:image/svg+xml;base64," + base64.b64encode(
 
 
 st.set_page_config(
-    page_title="Apple Developer Academy Prep",
+    page_title="Swift Programming Prep",
     page_icon=PAGE_ICON,
     layout="wide",
     initial_sidebar_state="collapsed",
@@ -953,7 +953,7 @@ def render_exam():
     with top_left:
         st.markdown(
             f"""
-            <div class="exam-name">Apple Developer Academy Simulation Test</div>
+            <div class="exam-name">Swift Programming Simulation Test</div>
             <div class="exam-meta">Soal {current_index + 1} dari {total} &nbsp;·&nbsp; {answered} dijawab &nbsp;·&nbsp; {flagged_count} di-flag</div>
             """,
             unsafe_allow_html=True,

@@ -100,17 +100,17 @@ QUESTIONS = {
     ],
 
     "Section 4: Bonus (Design/UX)": [
-        {"q": "Prinsip utama Apple dalam UI Design adalah HIG. Apa singkatannya?", "options": ["High Interface Guide", "Human Interface Guidelines", "Helpful Interface Graphics", "Human Integrated Goal"], "answer": "Human Interface Guidelines"},
+        {"q": "Dalam desain antarmuka platform iOS dikenal istilah HIG. Apa singkatannya?", "options": ["High Interface Guide", "Human Interface Guidelines", "Helpful Interface Graphics", "Human Integrated Goal"], "answer": "Human Interface Guidelines"},
         {"q": "Fitur paling krusial untuk aplikasi booking coworking space adalah...", "options": ["Filter harga & fasilitas", "Background warna-warni", "Animasi berat", "Chat bot"], "answer": "Filter harga & fasilitas"},
         {"q": "Dalam desain UI, apa yang dimaksud dengan 'Affordance'?", "options": ["Biaya pembuatan desain", "Petunjuk visual yang menunjukkan cara penggunaan suatu objek", "Kecepatan loading gambar", "Warna yang mencolok"], "answer": "Petunjuk visual yang menunjukkan cara penggunaan suatu objek"},
-        {"q": "Mana yang merupakan prinsip desain 'Consistency' menurut Apple?", "options": ["Menggunakan font yang berbeda di setiap halaman", "Menggunakan simbol dan gaya yang sama di seluruh aplikasi", "Mengubah posisi menu utama sesuka hati", "Menghapus tombol navigasi"], "answer": "Menggunakan simbol dan gaya yang sama di seluruh aplikasi"},
+        {"q": "Mana yang merupakan penerapan prinsip desain 'Consistency'?", "options": ["Menggunakan font yang berbeda di setiap halaman", "Menggunakan simbol dan gaya yang sama di seluruh aplikasi", "Mengubah posisi menu utama sesuka hati", "Menghapus tombol navigasi"], "answer": "Menggunakan simbol dan gaya yang sama di seluruh aplikasi"},
         {"q": "Apa tujuan utama dari 'User Research' sebelum membuat aplikasi?", "options": ["Menentukan harga aplikasi", "Memahami kebutuhan, perilaku, dan masalah pengguna", "Mencari investor", "Menghitung jumlah baris kodingan"], "answer": "Memahami kebutuhan, perilaku, dan masalah pengguna"},
         {"q": "Apa itu 'Dark Mode' dalam konteks UX?", "options": ["Aplikasi hanya bisa dibuka malam hari", "Skema warna gelap yang mengurangi kelelahan mata", "Mode aplikasi saat tidak ada internet", "Fitur untuk menyembunyikan data"], "answer": "Skema warna gelap yang mengurangi kelelahan mata"},
         {"q": "Prinsip 'Feedback' dalam UI berarti...", "options": ["Memberi tahu user hasil dari aksi yang mereka lakukan", "Meminta rating di App Store setiap menit", "Menghubungi customer service", "Menunggu balasan email"], "answer": "Memberi tahu user hasil dari aksi yang mereka lakukan"},
         {"q": "Apa yang dimaksud dengan 'Accessibility' (Aksesibilitas) pada aplikasi?", "options": ["Kemudahan akses download", "Desain yang bisa digunakan oleh semua orang, termasuk penyandang disabilitas", "Keamanan kata sandi", "Ukuran file yang kecil"], "answer": "Desain yang bisa digunakan oleh semua orang, termasuk penyandang disabilitas"},
-        {"q": "Dalam prinsip Apple, 'Clarity' berarti...", "options": ["Teks harus bisa dibaca dan ikon harus bermakna jelas", "Layar harus sangat terang", "Aplikasi harus transparan", "Menggunakan banyak gambar dekoratif"], "answer": "Teks harus bisa dibaca dan ikon harus bermakna jelas"},
+        {"q": "Dalam prinsip UI, 'Clarity' berarti...", "options": ["Teks harus bisa dibaca dan ikon harus bermakna jelas", "Layar harus sangat terang", "Aplikasi harus transparan", "Menggunakan banyak gambar dekoratif"], "answer": "Teks harus bisa dibaca dan ikon harus bermakna jelas"},
         {"q": "Mana yang merupakan contoh 'Bad UX'?", "options": ["Navigasi yang mudah ditemukan", "Tombol yang terlalu kecil dan sulit diklik", "Waktu loading yang cepat", "Bahasa yang mudah dimengerti"], "answer": "Tombol yang terlalu kecil dan sulit diklik"},
-        {"q": "Berapa ukuran minimum target sentuh yang direkomendasikan Apple untuk kontrol iOS?", "options": ["24×24 pt", "32×32 pt", "44×44 pt", "60×60 pt"], "answer": "44×44 pt", "explanation": "Apple merekomendasikan target sentuh setidaknya 44×44 pt agar kontrol mudah dipilih dengan jari dan lebih aksesibel."},
+        {"q": "Berapa ukuran minimum target sentuh yang umum direkomendasikan untuk kontrol iOS?", "options": ["24×24 pt", "32×32 pt", "44×44 pt", "60×60 pt"], "answer": "44×44 pt", "explanation": "Target sentuh setidaknya 44×44 pt membuat kontrol lebih mudah dipilih dengan jari dan lebih aksesibel."},
         {"q": "Apa tujuan utama hierarchy visual?", "options": ["Membuat semua elemen sama menonjol", "Mengarahkan perhatian sesuai prioritas informasi", "Menambah sebanyak mungkin warna", "Menghilangkan whitespace"], "answer": "Mengarahkan perhatian sesuai prioritas informasi", "explanation": "Hierarchy menggunakan ukuran, posisi, warna, dan jarak untuk menunjukkan urutan kepentingan serta membantu pengguna memindai layar."},
         {"q": "Untuk tombol yang hanya memakai ikon, dukungan aksesibilitas yang penting adalah...", "options": ["Bayangan yang besar", "Label aksesibilitas yang deskriptif", "Animasi berulang", "Warna neon"], "answer": "Label aksesibilitas yang deskriptif", "explanation": "Label deskriptif membuat fungsi tombol dapat dipahami pengguna screen reader ketika maknanya tidak tersedia sebagai teks visual."},
         {"q": "Apa manfaat usability testing dengan prototipe?", "options": ["Menjamin aplikasi bebas bug", "Menemukan hambatan penggunaan sebelum biaya implementasi membesar", "Menggantikan seluruh user research", "Menentukan bahasa pemrograman"], "answer": "Menemukan hambatan penggunaan sebelum biaya implementasi membesar", "explanation": "Prototipe memungkinkan alur diuji lebih awal. Masalah dapat ditemukan dan diperbaiki sebelum tim menginvestasikan banyak waktu pada implementasi."}
@@ -442,12 +442,12 @@ QUESTIONS = {
         },
         {
             "q": "Bagaimana urutan array setelah sorted dijalankan?",
-            "code": "let words = [\"pear\", \"fig\", \"apple\"]\nlet result = words.sorted {\n    $0.count < $1.count\n}\nprint(result)",
-            "options": ["[fig, pear, apple]", "[apple, pear, fig]", "[pear, fig, apple]", "[fig, apple, pear]"],
-            "answer": "[fig, pear, apple]",
+            "code": "let words = [\"pear\", \"fig\", \"mango\"]\nlet result = words.sorted {\n    $0.count < $1.count\n}\nprint(result)",
+            "options": ["[fig, pear, mango]", "[mango, pear, fig]", "[pear, fig, mango]", "[fig, mango, pear]"],
+            "answer": "[fig, pear, mango]",
             "difficulty": "Menengah",
             "concept": "Custom sorting closure",
-            "explanation": "Closure membandingkan panjang String secara ascending. fig memiliki 3 karakter, pear 4, dan apple 5, sehingga urutannya fig, pear, apple."
+            "explanation": "Closure membandingkan panjang String secara ascending. fig memiliki 3 karakter, pear 4, dan mango 5, sehingga urutannya fig, pear, mango."
         },
         {
             "q": "Apa output setelah salinan struct dimutasi?",
@@ -669,8 +669,8 @@ QUESTIONS = {
             "explanation": "Jumlah seluruh elemen adalah 6 + 8 + 10 = 24. Panjang array adalah 3, sehingga rata-ratanya 24 / 3 = 8."
         },
         {
-            "q": "Berapa frekuensi kata apple?",
-            "code": "SET words = [\"apple\", \"pear\", \"apple\", \"apple\"]\nSET count = 0\nFOR EACH word IN words\n    IF word == \"apple\" THEN\n        count = count + 1\n    ENDIF\nENDFOR\nPRINT count",
+            "q": "Berapa frekuensi kata swift?",
+            "code": "SET words = [\"swift\", \"code\", \"swift\", \"swift\"]\nSET count = 0\nFOR EACH word IN words\n    IF word == \"swift\" THEN\n        count = count + 1\n    ENDIF\nENDFOR\nPRINT count",
             "language": "text",
             "options": ["3", "4", "2", "1"],
             "answer": "3",
