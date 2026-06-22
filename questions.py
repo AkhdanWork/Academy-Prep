@@ -485,6 +485,309 @@ QUESTIONS = {
             "concept": "Array indexing",
             "explanation": "Array berisi tiga elemen dengan indeks valid 0, 1, dan 2. Indeks 3 melewati batas. Subscript Array biasa tidak menghasilkan optional; akses ini memicu runtime error."
         }
+    ],
+
+    "Section 7: Pseudocode Analysis": [
+        {
+            "q": "Berapakah hasil dari pemanggilan hitung(4)?",
+            "code": "FUNCTION hitung(n)\n    IF n == 1 THEN\n        RETURN 1\n    ELSE\n        RETURN n + hitung(n - 1)\n    ENDIF\nENDFUNCTION",
+            "language": "text",
+            "options": ["10", "24", "7", "4"],
+            "answer": "10",
+            "difficulty": "Menengah",
+            "concept": "Rekursi dan call stack",
+            "explanation": "Pemanggilan berkembang menjadi 4 + hitung(3), lalu 4 + 3 + hitung(2), dan akhirnya 4 + 3 + 2 + 1. Base case berhenti pada n = 1, sehingga hasilnya 10."
+        },
+        {
+            "q": "Nilai apa yang dicetak oleh algoritma berikut?",
+            "code": "SET arr = [2, 5, 1, 8, 4]\nSET m = arr[0]\nFOR EACH val IN arr\n    IF val > m THEN\n        m = val\n    ENDIF\nENDFOR\nPRINT m",
+            "language": "text",
+            "options": ["8", "1", "4", "20"],
+            "answer": "8",
+            "difficulty": "Pemula",
+            "concept": "Mencari nilai maksimum",
+            "explanation": "m dimulai dari elemen pertama, yaitu 2. Setiap nilai yang lebih besar menggantikan m: 5 mengganti 2, lalu 8 mengganti 5. Tidak ada nilai setelahnya yang melebihi 8."
+        },
+        {
+            "q": "Apakah output akhir dari pseudocode ini?",
+            "code": "SET str = \"\"\nFOR i FROM 1 TO 3\n    str = str + \"*\"\nENDFOR\nPRINT str",
+            "language": "text",
+            "options": ["`***`", "`**`", "`3*`", "`* * *`"],
+            "answer": "`***`",
+            "difficulty": "Pemula",
+            "concept": "Loop dan string concatenation",
+            "explanation": "Loop berjalan tiga kali. Setiap iterasi menambahkan satu karakter * tanpa spasi ke str, sehingga nilainya berturut-turut *, **, lalu ***."
+        },
+        {
+            "q": "Berapa nilai total setelah loop selesai?",
+            "code": "SET total = 0\nFOR i FROM 1 TO 5\n    total = total + i\nENDFOR\nPRINT total",
+            "language": "text",
+            "options": ["15", "10", "5", "20"],
+            "answer": "15",
+            "difficulty": "Pemula",
+            "concept": "Accumulator",
+            "explanation": "total mengakumulasi setiap nilai i: 0+1=1, +2=3, +3=6, +4=10, dan +5=15."
+        },
+        {
+            "q": "Berapa banyak bilangan genap yang dihitung?",
+            "code": "SET arr = [2, 5, 8, 11, 14]\nSET count = 0\nFOR EACH value IN arr\n    IF value MOD 2 == 0 THEN\n        count = count + 1\n    ENDIF\nENDFOR\nPRINT count",
+            "language": "text",
+            "options": ["3", "2", "4", "5"],
+            "answer": "3",
+            "difficulty": "Pemula",
+            "concept": "Modulo dan counting",
+            "explanation": "Bilangan genap memiliki sisa pembagian 2 sebesar 0. Elemen yang memenuhi adalah 2, 8, dan 14, sehingga count menjadi 3."
+        },
+        {
+            "q": "Array apa yang dicetak?",
+            "code": "SET arr = [1, 2, 3, 4]\nSET result = []\nFOR i FROM LENGTH(arr) - 1 DOWNTO 0\n    APPEND arr[i] TO result\nENDFOR\nPRINT result",
+            "language": "text",
+            "options": ["[4, 3, 2, 1]", "[1, 2, 3, 4]", "[3, 2, 1]", "[4, 2]"],
+            "answer": "[4, 3, 2, 1]",
+            "difficulty": "Pemula",
+            "concept": "Reverse traversal",
+            "explanation": "Indeks dimulai dari 3 dan bergerak turun sampai 0. Elemen yang dimasukkan ke result adalah arr[3], arr[2], arr[1], lalu arr[0]."
+        },
+        {
+            "q": "Berapa nilai count setelah nested loop selesai?",
+            "code": "SET count = 0\nFOR i FROM 1 TO 3\n    FOR j FROM 1 TO 2\n        count = count + 1\n    ENDFOR\nENDFOR\nPRINT count",
+            "language": "text",
+            "options": ["6", "5", "3", "9"],
+            "answer": "6",
+            "difficulty": "Pemula",
+            "concept": "Nested loop",
+            "explanation": "Loop luar berjalan 3 kali. Untuk setiap iterasi luar, loop dalam berjalan 2 kali. Total eksekusi increment adalah 3 × 2 = 6."
+        },
+        {
+            "q": "Berapa nilai result untuk n = 5?",
+            "code": "SET n = 5\nSET result = 1\nFOR i FROM 2 TO n\n    result = result * i\nENDFOR\nPRINT result",
+            "language": "text",
+            "options": ["120", "25", "15", "60"],
+            "answer": "120",
+            "difficulty": "Pemula",
+            "concept": "Factorial iteration",
+            "explanation": "result dikalikan berturut-turut dengan 2, 3, 4, dan 5. Perhitungannya 1 × 2 × 3 × 4 × 5 = 120."
+        },
+        {
+            "q": "Nilai Fibonacci apa yang dicetak?",
+            "code": "SET a = 0\nSET b = 1\nREPEAT 5 TIMES\n    SET temp = a + b\n    a = b\n    b = temp\nENDREPEAT\nPRINT a",
+            "language": "text",
+            "options": ["5", "8", "3", "13"],
+            "answer": "5",
+            "difficulty": "Menengah",
+            "concept": "Fibonacci dan state update",
+            "explanation": "Pasangan (a,b) berubah menjadi (1,1), (1,2), (2,3), (3,5), lalu (5,8). Setelah lima iterasi, nilai a yang dicetak adalah 5."
+        },
+        {
+            "q": "Berapa jumlah digit yang dicetak?",
+            "code": "SET n = 4820\nSET count = 0\nWHILE n > 0\n    n = FLOOR(n / 10)\n    count = count + 1\nENDWHILE\nPRINT count",
+            "language": "text",
+            "options": ["4", "3", "5", "482"],
+            "answer": "4",
+            "difficulty": "Menengah",
+            "concept": "Digit counting",
+            "explanation": "Pembagian bulat dengan 10 membuang satu digit setiap iterasi: 4820→482→48→4→0. Dibutuhkan empat iterasi, sehingga count bernilai 4."
+        },
+        {
+            "q": "Apa hasil pemeriksaan kata KATAK?",
+            "code": "SET word = \"KATAK\"\nSET left = 0\nSET right = LENGTH(word) - 1\nSET valid = TRUE\nWHILE left < right\n    IF word[left] != word[right] THEN\n        valid = FALSE\n    ENDIF\n    left = left + 1\n    right = right - 1\nENDWHILE\nPRINT valid",
+            "language": "text",
+            "options": ["TRUE", "FALSE", "KATAK", "5"],
+            "answer": "TRUE",
+            "difficulty": "Menengah",
+            "concept": "Palindrome dan two pointers",
+            "explanation": "Karakter dibandingkan dari kedua ujung: K sama dengan K dan A sama dengan A. Tidak ditemukan pasangan berbeda, sehingga valid tetap TRUE."
+        },
+        {
+            "q": "Indeks berapa yang dikembalikan? Gunakan indeks mulai dari 0.",
+            "code": "SET arr = [4, 7, 2, 9]\nSET target = 2\nFOR i FROM 0 TO LENGTH(arr) - 1\n    IF arr[i] == target THEN\n        RETURN i\n    ENDIF\nENDFOR\nRETURN -1",
+            "language": "text",
+            "options": ["2", "3", "1", "-1"],
+            "answer": "2",
+            "difficulty": "Pemula",
+            "concept": "Linear search",
+            "explanation": "Pencarian memeriksa indeks 0, 1, lalu 2. Nilai target 2 ditemukan pada arr[2], sehingga fungsi langsung mengembalikan indeks 2."
+        },
+        {
+            "q": "Apa nilai x dan y setelah proses swap?",
+            "code": "SET x = 3\nSET y = 8\nSET temp = x\nx = y\ny = temp\nPRINT x, y",
+            "language": "text",
+            "options": ["8, 3", "3, 8", "8, 8", "3, 3"],
+            "answer": "8, 3",
+            "difficulty": "Pemula",
+            "concept": "Variable swapping",
+            "explanation": "temp menyimpan nilai lama x, yaitu 3. x kemudian menerima 8 dari y, dan y menerima 3 dari temp."
+        },
+        {
+            "q": "Berapakah hasil power(2, 4)?",
+            "code": "FUNCTION power(base, exponent)\n    IF exponent == 0 THEN\n        RETURN 1\n    ENDIF\n    RETURN base * power(base, exponent - 1)\nENDFUNCTION",
+            "language": "text",
+            "options": ["16", "8", "6", "32"],
+            "answer": "16",
+            "difficulty": "Menengah",
+            "concept": "Recursive exponentiation",
+            "explanation": "Fungsi membentuk 2 × 2 × 2 × 2 × power(2,0). Base case mengembalikan 1, sehingga hasil akhirnya 16."
+        },
+        {
+            "q": "Nilai FPB apa yang dihasilkan algoritma Euclid?",
+            "code": "SET a = 48\nSET b = 18\nWHILE b != 0\n    SET temp = b\n    b = a MOD b\n    a = temp\nENDWHILE\nPRINT a",
+            "language": "text",
+            "options": ["6", "3", "12", "18"],
+            "answer": "6",
+            "difficulty": "Menengah",
+            "concept": "Euclidean algorithm",
+            "explanation": "Pasangan berubah dari (48,18) menjadi (18,12), lalu (12,6), dan akhirnya (6,0). Saat b menjadi 0, a berisi FPB yaitu 6."
+        },
+        {
+            "q": "Nilai apa yang berada di puncak stack?",
+            "code": "CREATE empty STACK s\nPUSH 2 INTO s\nPUSH 5 INTO s\nPOP s\nPUSH 8 INTO s\nPRINT PEEK s",
+            "language": "text",
+            "options": ["8", "5", "2", "Stack kosong"],
+            "answer": "8",
+            "difficulty": "Pemula",
+            "concept": "Stack LIFO",
+            "explanation": "Stack menggunakan LIFO. Setelah 5 di-pop, stack berisi 2. Kemudian 8 di-push dan menjadi elemen paling atas yang dibaca PEEK."
+        },
+        {
+            "q": "Nilai apa yang berada di depan queue?",
+            "code": "CREATE empty QUEUE q\nENQUEUE 4 INTO q\nENQUEUE 7 INTO q\nDEQUEUE q\nENQUEUE 9 INTO q\nPRINT FRONT q",
+            "language": "text",
+            "options": ["7", "9", "4", "Queue kosong"],
+            "answer": "7",
+            "difficulty": "Pemula",
+            "concept": "Queue FIFO",
+            "explanation": "Queue menggunakan FIFO. DEQUEUE menghapus 4 yang masuk pertama. Queue kemudian berisi 7 di depan dan 9 di belakang."
+        },
+        {
+            "q": "Berapa nilai rata-rata yang dicetak?",
+            "code": "SET arr = [6, 8, 10]\nSET total = 0\nFOR EACH value IN arr\n    total = total + value\nENDFOR\nSET average = total / LENGTH(arr)\nPRINT average",
+            "language": "text",
+            "options": ["8", "24", "6", "10"],
+            "answer": "8",
+            "difficulty": "Pemula",
+            "concept": "Average calculation",
+            "explanation": "Jumlah seluruh elemen adalah 6 + 8 + 10 = 24. Panjang array adalah 3, sehingga rata-ratanya 24 / 3 = 8."
+        },
+        {
+            "q": "Berapa frekuensi kata apple?",
+            "code": "SET words = [\"apple\", \"pear\", \"apple\", \"apple\"]\nSET count = 0\nFOR EACH word IN words\n    IF word == \"apple\" THEN\n        count = count + 1\n    ENDIF\nENDFOR\nPRINT count",
+            "language": "text",
+            "options": ["3", "4", "2", "1"],
+            "answer": "3",
+            "difficulty": "Pemula",
+            "concept": "Frequency counting",
+            "explanation": "Kondisi bernilai true pada elemen pertama, ketiga, dan keempat. Karena itu count bertambah tiga kali."
+        },
+        {
+            "q": "Teks apa yang dicetak?",
+            "code": "SET x = 7\nSET y = 3\nIF x MOD y == 1 AND x > 5 THEN\n    PRINT \"A\"\nELSE\n    PRINT \"B\"\nENDIF",
+            "language": "text",
+            "options": ["A", "B", "7", "TRUE"],
+            "answer": "A",
+            "difficulty": "Pemula",
+            "concept": "Boolean condition",
+            "explanation": "7 MOD 3 menghasilkan 1 dan 7 juga lebih besar dari 5. Kedua kondisi yang dihubungkan AND bernilai true, sehingga cabang A dijalankan."
+        },
+        {
+            "q": "Berapa total seluruh elemen matrix?",
+            "code": "SET matrix = [[1, 2], [3, 4]]\nSET total = 0\nFOR EACH row IN matrix\n    FOR EACH value IN row\n        total = total + value\n    ENDFOR\nENDFOR\nPRINT total",
+            "language": "text",
+            "options": ["10", "7", "4", "24"],
+            "answer": "10",
+            "difficulty": "Pemula",
+            "concept": "Matrix traversal",
+            "explanation": "Nested loop mengunjungi setiap elemen tepat satu kali. Akumulasi 1 + 2 + 3 + 4 menghasilkan 10."
+        },
+        {
+            "q": "Bagaimana keadaan array setelah satu pass penuh?",
+            "code": "SET arr = [5, 2, 4, 1]\nFOR i FROM 0 TO LENGTH(arr) - 2\n    IF arr[i] > arr[i + 1] THEN\n        SWAP arr[i], arr[i + 1]\n    ENDIF\nENDFOR\nPRINT arr",
+            "language": "text",
+            "options": ["[2, 4, 1, 5]", "[1, 2, 4, 5]", "[2, 5, 1, 4]", "[5, 2, 4, 1]"],
+            "answer": "[2, 4, 1, 5]",
+            "difficulty": "Menengah",
+            "concept": "Bubble sort pass",
+            "explanation": "5 bertukar dengan 2, lalu dengan 4, lalu dengan 1. Nilai terbesar 5 bergerak ke posisi terakhir, tetapi bagian sebelumnya belum sepenuhnya terurut."
+        },
+        {
+            "q": "Apa tujuan utama langkah selection sort ini?",
+            "code": "FOR i FROM 0 TO n - 2\n    SET minIndex = i\n    FOR j FROM i + 1 TO n - 1\n        IF arr[j] < arr[minIndex] THEN\n            minIndex = j\n        ENDIF\n    ENDFOR\n    SWAP arr[i], arr[minIndex]\nENDFOR",
+            "language": "text",
+            "options": ["Memindahkan nilai terkecil ke posisi i", "Memindahkan nilai terbesar ke akhir pada setiap perbandingan", "Menghapus nilai duplikat", "Menghitung jumlah elemen"],
+            "answer": "Memindahkan nilai terkecil ke posisi i",
+            "difficulty": "Menengah",
+            "concept": "Selection sort",
+            "explanation": "Loop dalam mencari indeks nilai terkecil pada bagian array yang belum terurut. Setelah ditemukan, nilai itu ditukar ke posisi i."
+        },
+        {
+            "q": "Indeks berapa yang dikembalikan binary search?",
+            "code": "SET arr = [1, 3, 5, 7, 9]\nSET target = 7\nSET low = 0\nSET high = 4\nWHILE low <= high\n    SET mid = FLOOR((low + high) / 2)\n    IF arr[mid] == target THEN RETURN mid\n    IF arr[mid] < target THEN\n        low = mid + 1\n    ELSE\n        high = mid - 1\n    ENDIF\nENDWHILE\nRETURN -1",
+            "language": "text",
+            "options": ["3", "4", "2", "-1"],
+            "answer": "3",
+            "difficulty": "Menengah",
+            "concept": "Binary search",
+            "explanation": "mid pertama adalah 2 dengan nilai 5, sehingga low menjadi 3. mid berikutnya adalah 3 dengan nilai 7, sama dengan target, lalu indeks 3 dikembalikan."
+        },
+        {
+            "q": "Apa kompleksitas waktu algoritma ini?",
+            "code": "SET total = 0\nFOR i FROM 0 TO n - 1\n    total = total + arr[i]\nENDFOR",
+            "language": "text",
+            "options": ["O(n)", "O(1)", "O(log n)", "O(n²)"],
+            "answer": "O(n)",
+            "difficulty": "Menengah",
+            "concept": "Time complexity",
+            "explanation": "Loop memproses tepat n elemen dan pekerjaan di setiap iterasi konstan. Waktu eksekusi tumbuh linear terhadap n, yaitu O(n)."
+        },
+        {
+            "q": "Apa kompleksitas waktu nested loop ini?",
+            "code": "FOR i FROM 1 TO n\n    FOR j FROM 1 TO n\n        PRINT i, j\n    ENDFOR\nENDFOR",
+            "language": "text",
+            "options": ["O(n²)", "O(n)", "O(log n)", "O(2n)"],
+            "answer": "O(n²)",
+            "difficulty": "Menengah",
+            "concept": "Nested-loop complexity",
+            "explanation": "Loop luar berjalan n kali dan setiap iterasi menjalankan loop dalam sebanyak n kali. Total operasi dominan adalah n × n = n²."
+        },
+        {
+            "q": "Nilai apa yang dikembalikan fungsi?",
+            "code": "FUNCTION firstEven(arr)\n    FOR EACH value IN arr\n        IF value MOD 2 == 0 THEN\n            RETURN value\n        ENDIF\n    ENDFOR\n    RETURN -1\nENDFUNCTION\n\nPRINT firstEven([1, 5, 8, 10])",
+            "language": "text",
+            "options": ["8", "10", "2", "-1"],
+            "answer": "8",
+            "difficulty": "Pemula",
+            "concept": "Early return",
+            "explanation": "1 dan 5 bukan genap. Saat mencapai 8, kondisi terpenuhi dan RETURN langsung menghentikan fungsi. Nilai 10 tidak pernah diperiksa."
+        },
+        {
+            "q": "Array unik apa yang dihasilkan dengan urutan tetap dipertahankan?",
+            "code": "SET arr = [2, 2, 1, 3, 1]\nSET result = []\nFOR EACH value IN arr\n    IF value NOT IN result THEN\n        APPEND value TO result\n    ENDIF\nENDFOR\nPRINT result",
+            "language": "text",
+            "options": ["[2, 1, 3]", "[1, 2, 3]", "[2, 2, 1, 3, 1]", "[2, 3]"],
+            "answer": "[2, 1, 3]",
+            "difficulty": "Menengah",
+            "concept": "Duplicate removal",
+            "explanation": "Kemunculan pertama 2, 1, dan 3 dimasukkan. Kemunculan berikutnya dari 2 dan 1 dilewati karena sudah ada di result."
+        },
+        {
+            "q": "Prefix sum apa yang dicetak?",
+            "code": "SET arr = [2, 4, 1]\nSET prefix = []\nSET running = 0\nFOR EACH value IN arr\n    running = running + value\n    APPEND running TO prefix\nENDFOR\nPRINT prefix",
+            "language": "text",
+            "options": ["[2, 6, 7]", "[2, 4, 1]", "[7, 7, 7]", "[0, 2, 6]"],
+            "answer": "[2, 6, 7]",
+            "difficulty": "Menengah",
+            "concept": "Prefix sum",
+            "explanation": "running menyimpan jumlah kumulatif: setelah 2 nilainya 2, setelah 4 menjadi 6, dan setelah 1 menjadi 7. Setiap nilai running dimasukkan ke prefix."
+        },
+        {
+            "q": "Apa urutan output fungsi countdown(3)?",
+            "code": "FUNCTION countdown(n)\n    IF n == 0 THEN\n        PRINT \"Done\"\n        RETURN\n    ENDIF\n    PRINT n\n    countdown(n - 1)\nENDFUNCTION",
+            "language": "text",
+            "options": ["3, 2, 1, Done", "Done, 1, 2, 3", "3, 2, 1, 0", "3, Done"],
+            "answer": "3, 2, 1, Done",
+            "difficulty": "Menengah",
+            "concept": "Recursive execution order",
+            "explanation": "PRINT dijalankan sebelum pemanggilan rekursif, sehingga 3, 2, dan 1 dicetak saat call stack bertambah. Pada n = 0, fungsi mencetak Done lalu berhenti."
+        }
     ]
     
 }

@@ -10,7 +10,7 @@ from pathlib import Path
 
 
 DB_PATH = Path(os.environ.get("ACADEMY_DB_PATH", "data/academy_prep.db"))
-PASSWORD_ITERATIONS = 310_000
+PASSWORD_ITERATIONS = 600_000
 EMAIL_PATTERN = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 
 
@@ -279,9 +279,3 @@ def get_concept_performance(user_id):
             (user_id,),
         ).fetchall()
     return [dict(row) for row in rows]
-
-
-def delete_all_data_for_tests():
-    """Only intended for automated tests using a temporary database path."""
-    if DB_PATH.exists():
-        DB_PATH.unlink()

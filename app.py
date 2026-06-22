@@ -1,12 +1,15 @@
+import base64
 import html
 import random
 import time
 from collections import defaultdict
 from datetime import datetime, timezone
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import pandas as pd
 import streamlit as st
+from PIL import Image
 
 from database import (
     authenticate_user,
@@ -20,19 +23,30 @@ from database import (
 from questions import QUESTIONS
 
 
+ROOT_DIR = Path(__file__).resolve().parent
+LOGO_PNG_PATH = ROOT_DIR / "assets" / "academy-prep-logo.png"
+LOGO_SVG_PATH = ROOT_DIR / "assets" / "academy-prep-logo.svg"
+with Image.open(LOGO_PNG_PATH) as logo_image:
+    PAGE_ICON = logo_image.copy()
+LOGO_DATA_URI = "data:image/svg+xml;base64," + base64.b64encode(
+    LOGO_SVG_PATH.read_bytes()
+).decode("ascii")
+
+
 st.set_page_config(
     page_title="Apple Developer Academy Prep",
-    page_icon="A",
+    page_icon=PAGE_ICON,
     layout="wide",
     initial_sidebar_state="collapsed",
 )
 
 
-TEST_DURATION_SECONDS = 90 * 60
+TEST_DURATION_SECONDS = 120 * 60
 SECTION_CONFIG = {
     "Section 1: Logic": {"label": "Logic", "quota": 10},
-    "Section 2: Programming (Swift Focus)": {"label": "Swift", "quota": 15},
-    "Section 6: Code Analysis": {"label": "Analisis Kode", "quota": 20},
+    "Section 2: Programming (Swift Focus)": {"label": "Swift", "quota": 10},
+    "Section 7: Pseudocode Analysis": {"label": "Analisis Pseudocode", "quota": 25},
+    "Section 6: Code Analysis": {"label": "Analisis Kode", "quota": 15},
     "Section 5: Code Completion": {"label": "Lengkapi Kode", "quota": 15},
     "Section 3: OOP": {"label": "OOP", "quota": 20},
     "Section 4: Bonus (Design/UX)": {"label": "Design & UX", "quota": 5},
@@ -66,10 +80,9 @@ st.markdown(
             display: flex; align-items: center; gap: .75rem; margin-bottom: 2.2rem;
             color: #f8fafc; font-weight: 750; letter-spacing: -.01em;
         }
-        .brand-mark {
-            display: grid; place-items: center; width: 36px; height: 36px;
-            border-radius: 11px; background: linear-gradient(145deg, #ff737a, #e84255);
-            box-shadow: 0 8px 24px rgba(255, 90, 98, .22); font-size: .9rem;
+        .brand-logo {
+            display: block; width: 40px; height: 40px; object-fit: contain;
+            filter: drop-shadow(0 8px 18px rgba(255, 82, 104, .24));
         }
         .eyebrow {
             color: #ff7b81; font-size: .76rem; font-weight: 800;
@@ -157,6 +170,10 @@ st.markdown(
             background: var(--surface); min-height: 460px;
         }
         .question-meta { color: var(--muted); font-size: .82rem; font-weight: 650; margin-bottom: .75rem; }
+        .st-key-flag_current_question .stButton > button {
+            min-height: 38px; padding: .35rem .8rem; font-size: .78rem;
+            white-space: nowrap;
+        }
         .question-title { font-size: clamp(1.2rem, 2.2vw, 1.65rem); line-height: 1.45; font-weight: 720; margin-bottom: 1.25rem; }
         .code-context {
             display: flex; flex-wrap: wrap; gap: .45rem; margin: -.35rem 0 1rem;
@@ -191,6 +208,16 @@ st.markdown(
         }
         .palette-title { color: #f8fafc; font-weight: 750; }
         .palette-copy { color: var(--muted); font-size: .78rem; margin: .2rem 0 .9rem; }
+        .palette-legend {
+            display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: .45rem .55rem; margin: .75rem 0 1rem;
+        }
+        .legend-item { display: flex; align-items: center; gap: .4rem; color: var(--muted); font-size: .68rem; }
+        .legend-swatch { width: 13px; height: 13px; border-radius: 4px; border: 1px solid #455164; flex: 0 0 auto; }
+        .legend-active { background: var(--accent); border-color: var(--accent); }
+        .legend-flagged { background: var(--warning); border-color: var(--warning); }
+        .legend-answered { background: #3b4655; border-color: #566274; }
+        .legend-empty { background: #0f151e; }
         .palette-section { color: var(--muted); font-size: .72rem; font-weight: 750; margin: .8rem 0 .35rem; }
         .st-key-question_palette .stButton > button {
             min-width: 0; width: 100%; min-height: 46px; padding: .35rem .2rem;
@@ -254,6 +281,12 @@ st.markdown(
 )
 
 
+@st.cache_resource
+def initialize_storage():
+    initialize_database()
+    return True
+
+
 def validate_question_bank():
     errors = []
     for section, items in QUESTIONS.items():
@@ -296,6 +329,7 @@ def start_test():
     st.session_state.test_id = st.session_state.get("test_id", 0) + 1
     st.session_state.test_questions = build_test_questions()
     st.session_state.answers = {}
+    st.session_state.flagged_questions = set()
     st.session_state.current_question = 0
     st.session_state.started_at = time.time()
     st.session_state.finished_at = None
@@ -404,6 +438,47 @@ def clear_answer(index, widget_key):
     st.session_state.pop(widget_key, None)
 
 
+def toggle_question_flag(index):
+    flagged_questions = set(st.session_state.get("flagged_questions", set()))
+    if index in flagged_questions:
+        flagged_questions.remove(index)
+    else:
+        flagged_questions.add(index)
+    st.session_state.flagged_questions = flagged_questions
+
+
+def render_navigation_status_styles(total, current_index):
+    answered_questions = st.session_state.answers
+    flagged_questions = st.session_state.flagged_questions
+    rules = []
+    for index in range(total):
+        selector = f".st-key-nav_{st.session_state.test_id}_{index} button"
+        if index == current_index:
+            rule = (
+                "background:#ff4f57!important;border-color:#ff4f57!important;"
+                "color:#ffffff!important;"
+            )
+            if index in flagged_questions:
+                rule += "box-shadow:0 0 0 3px #f6bf54!important;"
+        elif index in flagged_questions:
+            rule = (
+                "background:#f6bf54!important;border-color:#f6bf54!important;"
+                "color:#201806!important;font-weight:800!important;"
+            )
+        elif index in answered_questions:
+            rule = (
+                "background:#3b4655!important;border-color:#566274!important;"
+                "color:#f8fafc!important;"
+            )
+        else:
+            rule = (
+                "background:#0f151e!important;border-color:#354052!important;"
+                "color:#dce4ee!important;"
+            )
+        rules.append(f"{selector}{{{rule}}}")
+    st.markdown(f"<style>{''.join(rules)}</style>", unsafe_allow_html=True)
+
+
 def get_explanation(question):
     if question.get("explanation"):
         return question["explanation"]
@@ -439,9 +514,9 @@ def calculate_results():
 
 def render_brand():
     st.markdown(
-        """
+        f"""
         <div class="brand-row">
-            <div class="brand-mark">A</div>
+            <img class="brand-logo" src="{LOGO_DATA_URI}" alt="Academy Prep" />
             <div>Academy Prep</div>
         </div>
         """,
@@ -449,8 +524,327 @@ def render_brand():
     )
 
 
-def render_intro():
+def render_user_navigation(show_dashboard=True):
+    brand_column, dashboard_column, logout_column = st.columns(
+        [5, 1, 1], vertical_alignment="center"
+    )
+    with brand_column:
+        render_brand()
+    with dashboard_column:
+        if show_dashboard and st.button(
+            "Dashboard", width="stretch", key="go_to_dashboard"
+        ):
+            return_to_dashboard()
+            st.rerun()
+    with logout_column:
+        if st.button("Keluar", width="stretch", key="logout_account"):
+            logout_user()
+            st.rerun()
+
+
+def render_auth():
     render_brand()
+    marketing, auth_column = st.columns([1.25, 1], gap="large")
+    with marketing:
+        st.markdown('<div class="eyebrow">Progress Learning</div>', unsafe_allow_html=True)
+        st.markdown(
+            '<h1 class="auth-title">Belajar lebih terarah dari setiap tes.</h1>',
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            """
+            <p class="auth-copy">
+                Simpan seluruh hasil latihan, lihat apakah nilai meningkat, dan dapatkan
+                evaluasi berdasarkan section serta konsep yang masih perlu diperdalam.
+            </p>
+            <div class="auth-points">
+                <div class="auth-point"><span class="auth-point-number">01</span><span>Riwayat nilai tersimpan otomatis setelah tes selesai.</span></div>
+                <div class="auth-point"><span class="auth-point-number">02</span><span>Grafik membandingkan progres dari tes pertama hingga terbaru.</span></div>
+                <div class="auth-point"><span class="auth-point-number">03</span><span>Evaluasi menunjukkan kekuatan, kelemahan, dan fokus belajar berikutnya.</span></div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    with auth_column:
+        with st.container(key="auth_card", border=True):
+            login_tab, register_tab = st.tabs(["Masuk", "Daftar akun"])
+            with login_tab:
+                st.subheader("Masuk ke akun")
+                st.caption("Lanjutkan progres latihan Anda.")
+                locked_until = st.session_state.get("login_locked_until", 0)
+                remaining_lock = max(0, int(locked_until - time.time()))
+                with st.form("login_form"):
+                    email = st.text_input("Email", placeholder="nama@email.com")
+                    password = st.text_input("Password", type="password")
+                    submitted = st.form_submit_button(
+                        "Masuk", type="primary", width="stretch",
+                        disabled=remaining_lock > 0,
+                    )
+
+                if remaining_lock > 0:
+                    st.warning(f"Terlalu banyak percobaan. Coba lagi dalam {remaining_lock} detik.")
+                elif submitted:
+                    user = authenticate_user(email, password)
+                    if user:
+                        set_authenticated_user(user)
+                        st.rerun()
+                    else:
+                        failures = st.session_state.get("login_failures", 0) + 1
+                        st.session_state.login_failures = failures
+                        if failures >= 5:
+                            st.session_state.login_locked_until = time.time() + 30
+                            st.session_state.login_failures = 0
+                        st.error("Email atau password tidak sesuai.")
+
+            with register_tab:
+                st.subheader("Buat akun baru")
+                st.caption("Hasil tes akan tersimpan pada akun ini.")
+                with st.form("register_form"):
+                    name = st.text_input("Nama lengkap", placeholder="Nama Anda")
+                    register_email = st.text_input(
+                        "Email", placeholder="nama@email.com", key="register_email"
+                    )
+                    register_password = st.text_input(
+                        "Password",
+                        type="password",
+                        help="Minimal 8 karakter serta memiliki huruf dan angka.",
+                        key="register_password",
+                    )
+                    confirmation = st.text_input(
+                        "Ulangi password", type="password", key="password_confirmation"
+                    )
+                    registered = st.form_submit_button(
+                        "Daftar akun", type="primary", width="stretch"
+                    )
+
+                if registered:
+                    if register_password != confirmation:
+                        st.error("Konfirmasi password tidak sama.")
+                    else:
+                        user, error = create_user(name, register_email, register_password)
+                        if error:
+                            st.error(error)
+                        else:
+                            set_authenticated_user(user)
+                            st.rerun()
+                st.markdown(
+                    '<div class="account-note">Password disimpan sebagai hash PBKDF2, bukan teks asli.</div>',
+                    unsafe_allow_html=True,
+                )
+
+
+def _format_attempt_date(value):
+    parsed = datetime.fromisoformat(value)
+    return parsed.astimezone(ZoneInfo("Asia/Jakarta")).strftime("%d %b %Y, %H:%M")
+
+
+def _section_recommendation(section):
+    recommendations = {
+        "Logic": "Latih pola angka, relasi premis, dan soal hitung dengan menuliskan langkah sebelum memilih jawaban.",
+        "Swift": "Ulangi fundamental tipe data, collection, optional, function, dan kontrol alur Swift.",
+        "Analisis Kode": "Trace kode baris demi baris. Catat perubahan nilai, urutan eksekusi, serta tipe setiap ekspresi.",
+        "Analisis Pseudocode": "Buat tabel trace untuk setiap iterasi atau pemanggilan rekursif sebelum menentukan output algoritma.",
+        "Lengkapi Kode": "Biasakan menulis snippet kecil tanpa autocomplete dan pahami kontrak setiap API Swift.",
+        "OOP": "Perkuat value/reference semantics, protocol, inheritance, encapsulation, dan composition.",
+        "Design & UX": "Pelajari kembali HIG, accessibility, hierarchy, consistency, dan feedback pengguna.",
+    }
+    return recommendations.get(section, "Tinjau kembali pembahasan jawaban yang salah pada section ini.")
+
+
+def render_dashboard():
+    user = st.session_state.user
+    user_name = html.escape(user["name"])
+    render_user_navigation(show_dashboard=False)
+
+    header_content, start_column = st.columns([4, 1], vertical_alignment="bottom")
+    with header_content:
+        st.markdown('<div class="eyebrow">Learning Dashboard</div>', unsafe_allow_html=True)
+        st.markdown(
+            f'<h1 class="dashboard-title">Halo, {user_name}</h1>',
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            '<div class="dashboard-copy">Pantau perkembangan dan tentukan fokus latihan berikutnya.</div>',
+            unsafe_allow_html=True,
+        )
+    with start_column:
+        if st.button("Mulai Tes Baru", type="primary", width="stretch"):
+            return_to_intro()
+            st.rerun()
+
+    attempts = get_attempts(user["id"])
+    section_performance = get_section_performance(user["id"])
+    concept_performance = get_concept_performance(user["id"])
+
+    if not attempts:
+        st.markdown(
+            """
+            <div class="result-hero">
+                <div class="eyebrow">Belum Ada Riwayat</div>
+                <h2 class="result-title">Tes pertama akan menjadi baseline Anda.</h2>
+                <div class="result-copy">Setelah selesai, dashboard akan menampilkan grafik, perbandingan nilai, dan evaluasi personal.</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.info("Klik “Mulai Tes Baru” untuk membuat baseline progres pertama.")
+        return
+
+    scores = [attempt["score"] for attempt in attempts]
+    latest_score = scores[-1]
+    average_score = sum(scores) / len(scores)
+    best_score = max(scores)
+    if len(scores) >= 2:
+        score_delta = scores[-1] - scores[-2]
+        if score_delta > 0:
+            trend_text = f"Naik {score_delta:+.1f} poin"
+            trend_class = "trend-up"
+        elif score_delta < 0:
+            trend_text = f"Turun {score_delta:.1f} poin"
+            trend_class = "trend-down"
+        else:
+            trend_text = "Tidak berubah"
+            trend_class = "trend-flat"
+    else:
+        score_delta = None
+        trend_text = "Tes pertama"
+        trend_class = "trend-flat"
+
+    metrics = [
+        (f"{latest_score:.0f}", "Nilai terbaru", trend_text, trend_class),
+        (f"{average_score:.0f}", "Rata-rata nilai", f"Dari {len(attempts)} tes", ""),
+        (f"{best_score:.0f}", "Nilai terbaik", "Personal best", "trend-up"),
+        (str(len(attempts)), "Tes diselesaikan", f"Terakhir {_format_attempt_date(attempts[-1]['completed_at'])}", ""),
+    ]
+    metric_cards = "".join(
+        f"""
+            <div class="dashboard-card">
+                <div class="dashboard-value">{value}</div>
+                <div class="dashboard-label">{label}</div>
+                <div class="dashboard-detail {detail_class}">{detail}</div>
+            </div>
+        """
+        for value, label, detail, detail_class in metrics
+    )
+    st.markdown(
+        f'<div class="dashboard-grid">{metric_cards}</div>',
+        unsafe_allow_html=True,
+    )
+
+    progress_tab, evaluation_tab, history_tab = st.tabs(
+        ["Progres", "Evaluasi", "Riwayat Tes"]
+    )
+    with progress_tab:
+        st.subheader("Perkembangan nilai")
+        chart_data = pd.DataFrame(
+            {
+                "Tes": list(range(1, len(attempts) + 1)),
+                "Nilai": scores,
+                "Target": [75] * len(attempts),
+            }
+        )
+        st.line_chart(
+            chart_data,
+            x="Tes",
+            y=["Nilai", "Target"],
+            x_label="Percobaan",
+            y_label="Nilai",
+            color=["#FF5A62", "#667386"],
+        )
+
+        st.subheader("Performa per section")
+        section_chart = pd.DataFrame(
+            {
+                "Section": [row["section"] for row in section_performance],
+                "Akurasi": [row["correct"] / row["total"] * 100 for row in section_performance],
+            }
+        )
+        st.bar_chart(
+            section_chart,
+            x="Section",
+            y="Akurasi",
+            y_label="Akurasi (%)",
+            color="#FF5A62",
+        )
+
+    with evaluation_tab:
+        st.subheader("Evaluasi belajar")
+        strongest = section_performance[0]
+        weakest = section_performance[-1]
+        strongest_score = strongest["correct"] / strongest["total"] * 100
+        weakest_score = weakest["correct"] / weakest["total"] * 100
+
+        evaluation_columns = st.columns(3)
+        evaluations = [
+            (
+                "Kekuatan utama",
+                f'{strongest["section"]} · {strongest_score:.0f}%',
+                "Pertahankan kemampuan ini sambil meningkatkan konsistensi pada section lain.",
+            ),
+            (
+                "Prioritas belajar",
+                f'{weakest["section"]} · {weakest_score:.0f}%',
+                _section_recommendation(weakest["section"]),
+            ),
+            (
+                "Arah progres",
+                trend_text,
+                "Bandingkan minimal tiga tes untuk melihat tren yang lebih representatif."
+                if len(attempts) < 3
+                else "Gunakan tren ini bersama akurasi per section, bukan nilai total saja.",
+            ),
+        ]
+        for column, (kicker, title, copy) in zip(evaluation_columns, evaluations):
+            with column:
+                st.markdown(
+                    f"""
+                    <div class="evaluation-card">
+                        <div class="evaluation-kicker">{kicker}</div>
+                        <div class="evaluation-title">{title}</div>
+                        <div class="evaluation-copy">{copy}</div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
+        st.write("")
+        st.subheader("Konsep yang perlu ditinjau")
+        if concept_performance:
+            concept_rows = []
+            for row in concept_performance[:8]:
+                accuracy = row["correct"] / row["total"] * 100
+                concept_rows.append(
+                    {
+                        "Konsep": row["concept"],
+                        "Benar": f'{row["correct"]}/{row["total"]}',
+                        "Akurasi": f"{accuracy:.0f}%",
+                        "Evaluasi": "Prioritas" if accuracy < 60 else "Perlu latihan" if accuracy < 75 else "Baik",
+                    }
+                )
+            st.dataframe(concept_rows, hide_index=True, width="stretch")
+        else:
+            st.caption("Data konsep akan muncul setelah mengerjakan soal analisis kode.")
+
+    with history_tab:
+        st.subheader("Seluruh percobaan")
+        history_rows = []
+        for number, attempt in enumerate(attempts, start=1):
+            history_rows.append(
+                {
+                    "Tes": number,
+                    "Tanggal": _format_attempt_date(attempt["completed_at"]),
+                    "Nilai": f'{attempt["score"]:.1f}',
+                    "Benar": f'{attempt["correct"]}/{attempt["total"]}',
+                    "Kosong": attempt["unanswered"],
+                    "Durasi": format_duration(attempt["duration_seconds"]),
+                }
+            )
+        st.dataframe(history_rows, hide_index=True, width="stretch")
+
+
+def render_intro():
+    render_user_navigation(show_dashboard=True)
     st.markdown('<div class="eyebrow">Simulation Test</div>', unsafe_allow_html=True)
     st.markdown(
         '<h1 class="hero-title">Latihan dengan suasana tes yang sebenarnya.</h1>',
@@ -463,8 +857,8 @@ def render_intro():
             jawaban beserta pembahasannya setelah tes selesai.
         </p>
         <div class="info-strip">
-            <div class="info-item"><div class="info-value">85 soal</div><div class="info-label">50 soal berfokus pada Swift</div></div>
-            <div class="info-item"><div class="info-value">90 menit</div><div class="info-label">Timer berjalan setelah tes dimulai</div></div>
+            <div class="info-item"><div class="info-value">100 soal</div><div class="info-label">25 soal analisis pseudocode</div></div>
+            <div class="info-item"><div class="info-value">120 menit</div><div class="info-label">Timer berjalan setelah tes dimulai</div></div>
             <div class="info-item"><div class="info-value">75%</div><div class="info-label">Target nilai latihan</div></div>
         </div>
         """,
@@ -492,7 +886,7 @@ def render_intro():
             )
 
     st.write("")
-    if st.button("Mulai Tes", type="primary", use_container_width=True):
+    if st.button("Mulai Tes", type="primary", width="stretch"):
         start_test()
         st.rerun()
 
@@ -520,17 +914,20 @@ def render_timer():
 def confirm_finish_dialog():
     total = len(st.session_state.test_questions)
     unanswered = total - len(st.session_state.answers)
+    flagged = len(st.session_state.get("flagged_questions", set()))
     if unanswered:
         st.warning(f"Masih ada {unanswered} soal yang belum dijawab.")
     else:
         st.success("Semua soal sudah dijawab.")
+    if flagged:
+        st.info(f"Ada {flagged} soal yang masih di-flag untuk ditinjau.")
     st.write("Setelah dikumpulkan, jawaban tidak dapat diubah.")
     left, right = st.columns(2)
     with left:
-        if st.button("Lanjut Mengerjakan", use_container_width=True):
+        if st.button("Lanjut Mengerjakan", width="stretch"):
             st.rerun()
     with right:
-        if st.button("Kumpulkan Jawaban", type="primary", use_container_width=True):
+        if st.button("Kumpulkan Jawaban", type="primary", width="stretch"):
             finish_test()
             st.rerun()
 
@@ -541,18 +938,23 @@ def render_exam():
         finish_test("time_up")
         st.rerun()
 
+    if "flagged_questions" not in st.session_state:
+        st.session_state.flagged_questions = set()
+
     total = len(st.session_state.test_questions)
     current_index = st.session_state.current_question
     question_data = st.session_state.test_questions[current_index]
     question = question_data["item"]
     answered = len(st.session_state.answers)
+    flagged_count = len(st.session_state.flagged_questions)
+    is_flagged = current_index in st.session_state.flagged_questions
 
     top_left, top_right = st.columns([5, 1.25], vertical_alignment="center")
     with top_left:
         st.markdown(
             f"""
             <div class="exam-name">Apple Developer Academy Simulation Test</div>
-            <div class="exam-meta">Soal {current_index + 1} dari {total} &nbsp;·&nbsp; {answered} sudah dijawab</div>
+            <div class="exam-meta">Soal {current_index + 1} dari {total} &nbsp;·&nbsp; {answered} dijawab &nbsp;·&nbsp; {flagged_count} di-flag</div>
             """,
             unsafe_allow_html=True,
         )
@@ -569,10 +971,35 @@ def render_exam():
     main, palette = st.columns([3, 1.2], gap="large")
     with main:
         with st.container(key="question_card", border=True):
-            st.markdown(
-                f'<div class="question-meta">{question_data["section_label"]} · Soal {question_data["section_number"]}</div>',
-                unsafe_allow_html=True,
-            )
+            meta_column, flag_column = st.columns([4, 1], vertical_alignment="center")
+            with meta_column:
+                st.markdown(
+                    f'<div class="question-meta">{question_data["section_label"]} · Soal {question_data["section_number"]}</div>',
+                    unsafe_allow_html=True,
+                )
+            with flag_column:
+                if is_flagged:
+                    flag_rule = (
+                        "background:#f6bf54!important;border-color:#f6bf54!important;"
+                        "color:#201806!important;font-weight:800!important;"
+                    )
+                else:
+                    flag_rule = (
+                        "background:transparent!important;border-color:#8f7539!important;"
+                        "color:#f6bf54!important;"
+                    )
+                st.markdown(
+                    f"<style>.st-key-flag_current_question button{{{flag_rule}}}</style>",
+                    unsafe_allow_html=True,
+                )
+                st.button(
+                    "Hapus Flag" if is_flagged else "Flag Soal",
+                    key="flag_current_question",
+                    on_click=toggle_question_flag,
+                    args=(current_index,),
+                    width="stretch",
+                    help="Tandai soal ini untuk ditinjau kembali",
+                )
             st.markdown(f'<div class="question-title">{question["q"]}</div>', unsafe_allow_html=True)
             if question.get("difficulty") or question.get("concept"):
                 badges = "".join(
@@ -582,7 +1009,11 @@ def render_exam():
                 )
                 st.markdown(f'<div class="code-context">{badges}</div>', unsafe_allow_html=True)
             if question.get("code"):
-                st.code(question["code"], language="swift", line_numbers=True)
+                st.code(
+                    question["code"],
+                    language=question.get("language", "swift"),
+                    line_numbers=True,
+                )
             st.markdown('<div class="choice-label">Pilih satu jawaban</div>', unsafe_allow_html=True)
 
             widget_key = f"answer_{st.session_state.test_id}_{current_index}"
@@ -614,7 +1045,7 @@ def render_exam():
                 disabled=current_index == 0,
                 on_click=move_question,
                 args=(-1,),
-                use_container_width=True,
+                width="stretch",
             )
         with next_column:
             if current_index < total - 1:
@@ -623,19 +1054,31 @@ def render_exam():
                     type="primary",
                     on_click=move_question,
                     args=(1,),
-                    use_container_width=True,
+                    width="stretch",
                 )
             else:
-                if st.button("Selesaikan Tes", type="primary", use_container_width=True):
+                if st.button("Selesaikan Tes", type="primary", width="stretch"):
                     confirm_finish_dialog()
 
     with palette:
         with st.container(key="question_palette", border=True):
             st.markdown('<div class="palette-title">Navigasi soal</div>', unsafe_allow_html=True)
             st.markdown(
-                '<div class="palette-copy">Soal aktif berwarna merah. Soal terjawab diberi tanda.</div>',
+                '<div class="palette-copy">Gunakan warna untuk melihat status setiap soal.</div>',
                 unsafe_allow_html=True,
             )
+            st.markdown(
+                """
+                <div class="palette-legend" aria-label="Keterangan status soal">
+                    <div class="legend-item"><span class="legend-swatch legend-active"></span>Aktif</div>
+                    <div class="legend-item"><span class="legend-swatch legend-flagged"></span>Di-flag</div>
+                    <div class="legend-item"><span class="legend-swatch legend-answered"></span>Terjawab</div>
+                    <div class="legend-item"><span class="legend-swatch legend-empty"></span>Belum dijawab</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+            render_navigation_status_styles(total, current_index)
 
             grouped_indices = defaultdict(list)
             for index, data in enumerate(st.session_state.test_questions):
@@ -648,8 +1091,16 @@ def render_exam():
                     columns = st.columns(4)
                     for column, index in zip(columns, row_indices):
                         label = f"{index + 1}"
-                        if index in st.session_state.answers and index != current_index:
-                            label = f"{index + 1}·"
+                        if index == current_index:
+                            status_text = "aktif"
+                            if index in st.session_state.flagged_questions:
+                                status_text += " dan di-flag"
+                        elif index in st.session_state.flagged_questions:
+                            status_text = "di-flag untuk ditinjau"
+                        elif index in st.session_state.answers:
+                            status_text = "sudah dijawab"
+                        else:
+                            status_text = "belum dijawab"
                         with column:
                             st.button(
                                 label,
@@ -657,17 +1108,18 @@ def render_exam():
                                 type="primary" if index == current_index else "secondary",
                                 on_click=go_to_question,
                                 args=(index,),
-                                use_container_width=True,
-                                help=f"Buka soal {index + 1}",
+                                width="stretch",
+                                help=f"Soal {index + 1}: {status_text}",
                             )
 
             st.divider()
-            if st.button("Kumpulkan Jawaban", use_container_width=True):
+            if st.button("Kumpulkan Jawaban", width="stretch"):
                 confirm_finish_dialog()
 
 
 def render_results():
-    render_brand()
+    persist_current_attempt()
+    render_user_navigation(show_dashboard=True)
     correct, total, section_results = calculate_results()
     unanswered = total - len(st.session_state.answers)
     incorrect = total - correct - unanswered
@@ -716,6 +1168,13 @@ def render_results():
 
     if st.session_state.finish_reason == "time_up":
         st.warning("Waktu habis. Jawaban yang sudah dipilih tetap dinilai.")
+    if st.session_state.get("persistence_error"):
+        st.error(
+            "Hasil tampil, tetapi riwayat belum berhasil disimpan. "
+            f'Detail: {st.session_state.persistence_error}'
+        )
+    elif st.session_state.get("attempt_id"):
+        st.success("Hasil tes sudah disimpan ke progres akun Anda.")
 
     st.write("")
     st.subheader("Nilai per section")
@@ -736,12 +1195,12 @@ def render_results():
     st.write("")
     action_left, action_right, action_space = st.columns([1, 1, 2])
     with action_left:
-        if st.button("Tes Lagi", type="primary", use_container_width=True):
+        if st.button("Tes Lagi", type="primary", width="stretch"):
             start_test()
             st.rerun()
     with action_right:
-        if st.button("Kembali ke Awal", use_container_width=True):
-            return_to_intro()
+        if st.button("Kembali ke Dashboard", width="stretch"):
+            return_to_dashboard()
             st.rerun()
 
     st.divider()
@@ -778,7 +1237,11 @@ def render_results():
                 unsafe_allow_html=True,
             )
             if question.get("code"):
-                st.code(question["code"], language="swift", line_numbers=True)
+                st.code(
+                    question["code"],
+                    language=question.get("language", "swift"),
+                    line_numbers=True,
+                )
             if question.get("difficulty") or question.get("concept"):
                 badges = "".join(
                     f'<span class="code-badge">{value}</span>'
@@ -819,15 +1282,25 @@ def render_results():
             )
 
 
+initialize_storage()
+
 bank_errors = validate_question_bank()
 if bank_errors:
     st.error("Bank soal belum valid:\n- " + "\n- ".join(bank_errors))
     st.stop()
 
+if "user" not in st.session_state:
+    st.session_state.user = None
 if "screen" not in st.session_state:
-    st.session_state.screen = "intro"
+    st.session_state.screen = "dashboard" if st.session_state.user else "auth"
+if not st.session_state.user:
+    st.session_state.screen = "auth"
 
-if st.session_state.screen == "intro":
+if st.session_state.screen == "auth":
+    render_auth()
+elif st.session_state.screen == "dashboard":
+    render_dashboard()
+elif st.session_state.screen == "intro":
     render_intro()
 elif st.session_state.screen == "exam":
     render_exam()
