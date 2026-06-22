@@ -1,15 +1,16 @@
+import pandas as pd
+import streamlit as st
 import base64
 import html
 import random
 import time
+import os
+import json
+from PIL import Image
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
-
-import pandas as pd
-import streamlit as st
-from PIL import Image
 
 from database import (
     authenticate_user,
@@ -49,15 +50,95 @@ st.set_page_config(
 
 TEST_DURATION_SECONDS = 120 * 60
 SECTION_CONFIG = {
-    "Section 1: Logic": {"label": "Logic", "quota": 10},
+    "Section 1: Logic": {"label": "Logic", "quota": 20},
     "Section 2: Programming (Swift Focus)": {"label": "Swift", "quota": 10},
-    "Section 7: Pseudocode Analysis": {"label": "Analisis Pseudocode", "quota": 25},
+    "Section 7: Pseudocode Analysis": {"label": "Analisis Pseudocode", "quota": 15},
     "Section 6: Code Analysis": {"label": "Analisis Kode", "quota": 15},
     "Section 5: Code Completion": {"label": "Lengkapi Kode", "quota": 15},
     "Section 3: OOP": {"label": "OOP", "quota": 20},
     "Section 4: Bonus (Design/UX)": {"label": "Design & UX", "quota": 5},
 }
 
+# ── Translations ──────────────────────────────────────────────────────────────
+TRANSLATIONS = {
+    "id": {
+        "lang_label": "Bahasa",
+        "nav_title": "Navigasi soal",
+        "nav_copy": "Gunakan warna untuk melihat status setiap soal.",
+        "legend_active": "Aktif",
+        "legend_flagged": "Di-flag",
+        "legend_answered": "Terjawab",
+        "legend_empty": "Belum dijawab",
+        "btn_submit": "Kumpulkan Jawaban",
+        "btn_prev": "Sebelumnya",
+        "btn_next": "Berikutnya",
+        "btn_finish": "Selesaikan Tes",
+        "btn_flag": "Flag Soal",
+        "btn_unflag": "Hapus Flag",
+        "btn_clear": "Kosongkan jawaban",
+        "choice_label": "Pilih satu jawaban",
+        "timer_label": "Sisa waktu",
+        "status_active": "aktif",
+        "status_flagged": "di-flag untuk ditinjau",
+        "status_answered": "sudah dijawab",
+        "status_unanswered": "belum dijawab",
+        "status_active_and_flagged": "aktif dan di-flag",
+        "soal_prefix": "Soal",
+        "dari": "dari",
+        "dijawab": "dijawab",
+        "di_flag": "di-flag",
+        "collapse": "▲",
+        "expand": "▼",
+    },
+    "en": {
+        "lang_label": "Language",
+        "nav_title": "Question Navigator",
+        "nav_copy": "Use colors to see the status of each question.",
+        "legend_active": "Active",
+        "legend_flagged": "Flagged",
+        "legend_answered": "Answered",
+        "legend_empty": "Unanswered",
+        "btn_submit": "Submit Answers",
+        "btn_prev": "Previous",
+        "btn_next": "Next",
+        "btn_finish": "Finish Test",
+        "btn_flag": "Flag Question",
+        "btn_unflag": "Remove Flag",
+        "btn_clear": "Clear answer",
+        "choice_label": "Choose one answer",
+        "timer_label": "Time left",
+        "status_active": "active",
+        "status_flagged": "flagged for review",
+        "status_answered": "answered",
+        "status_unanswered": "unanswered",
+        "status_active_and_flagged": "active and flagged",
+        "soal_prefix": "Question",
+        "dari": "of",
+        "dijawab": "answered",
+        "di_flag": "flagged",
+        "collapse": "▲",
+        "expand": "▼",
+    },
+}
+
+
+def get_lang():
+    """Return the current UI language ('id' or 'en')."""
+    return st.session_state.get("ui_lang", "id")
+
+
+def t(key):
+    """Translate a key using the current language."""
+    return TRANSLATIONS[get_lang()].get(key, key)
+
+
+def q_text(item, field):
+    """Return the EN version of a question field when EN is active, otherwise ID."""
+    lang = get_lang()
+    en_field = field + "_en"
+    if lang == "en" and en_field in item:
+        return item[en_field]
+    return item.get(field, "")
 
 st.markdown(
     """
@@ -226,12 +307,32 @@ st.markdown(
         .legend-empty { background: #0f151e; }
         .palette-section { color: var(--muted); font-size: .72rem; font-weight: 750; margin: .8rem 0 .35rem; }
         .st-key-question_palette .stButton > button {
-            min-width: 0; width: 100%; min-height: 46px; padding: .35rem .2rem;
-            font-size: .84rem; white-space: nowrap;
+            min-width: 0; width: 100%; min-height: 36px; padding: .1rem 0;
+            font-size: .65rem; white-space: nowrap; line-height: 1; margin: 0;
         }
         .st-key-question_palette .stButton > button p {
             white-space: nowrap; overflow: hidden; text-overflow: clip;
+            font-size: .65rem; margin: 0; padding: 0;
         }
+        .palette-section-header {
+            display: flex; justify-content: space-between; align-items: center;
+            cursor: pointer; user-select: none; padding: .4rem .2rem;
+            border-radius: 8px; transition: background 150ms ease;
+        }
+        .palette-section-header:hover { background: rgba(255,255,255,.04); }
+        .palette-section-label { color: var(--muted); font-size: .72rem; font-weight: 750; }
+        .palette-section-toggle { color: var(--muted); font-size: .65rem; transition: transform 200ms; }
+        .lang-switcher {
+            display: flex; gap: .4rem; align-items: center; margin-bottom: .6rem;
+        }
+        .lang-btn {
+            display: inline-flex; align-items: center; gap: .3rem;
+            padding: .3rem .6rem; border-radius: 8px; font-size: .72rem; font-weight: 700;
+            cursor: pointer; border: 1px solid var(--border); background: transparent;
+            color: var(--muted); transition: all 150ms ease;
+        }
+        .lang-btn:hover { border-color: #667386; color: #f8fafc; }
+        .lang-btn.lang-active { border-color: var(--accent); color: #f8fafc; background: var(--accent-soft); }
 
         .progress-copy { display: flex; justify-content: space-between; color: var(--muted); font-size: .78rem; margin: .15rem 0 .35rem; }
         div[data-testid="stProgress"] > div > div { background-color: var(--accent); }
@@ -334,7 +435,13 @@ def build_test_questions():
         sample_size = min(config["quota"], len(section_questions))
         for section_number, item in enumerate(random.sample(section_questions, sample_size), start=1):
             prepared_item = dict(item)
-            prepared_item["options"] = random.sample(item["options"], len(item["options"]))
+            # Shuffle the ID options; EN options keep the same order relative to ID
+            shuffled_order = random.sample(range(len(item["options"])), len(item["options"]))
+            prepared_item["options"] = [item["options"][i] for i in shuffled_order]
+            if "options_en" in item:
+                prepared_item["options_en"] = [item["options_en"][i] for i in shuffled_order]
+                # Also re-map answer_en to match shuffled options_en order
+                prepared_item["answer_en"] = item.get("answer_en", item.get("answer", ""))
             test_questions.append(
                 {
                     "section": section,
@@ -369,9 +476,67 @@ def return_to_dashboard():
     st.session_state.screen = "dashboard"
 
 
+def save_active_test():
+    if not st.session_state.get("user") or st.session_state.get("screen") != "exam":
+        return
+    user_id = st.session_state.user["id"]
+    state = {
+        "test_id": st.session_state.get("test_id"),
+        "test_questions": st.session_state.get("test_questions"),
+        "answers": st.session_state.get("answers", {}),
+        "flagged_questions": list(st.session_state.get("flagged_questions", set())),
+        "current_question": st.session_state.get("current_question", 0),
+        "started_at": st.session_state.get("started_at"),
+    }
+    os.makedirs("data", exist_ok=True)
+    with open(f"data/active_test_{user_id}.json", "w", encoding="utf-8") as f:
+        json.dump(state, f)
+
+
+def load_active_test():
+    if not st.session_state.get("user"):
+        return False
+    user_id = st.session_state.user["id"]
+    file_path = f"data/active_test_{user_id}.json"
+    if os.path.exists(file_path):
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                state = json.load(f)
+            st.session_state.test_id = state.get("test_id", 1)
+            st.session_state.test_questions = state.get("test_questions", [])
+            st.session_state.answers = {int(k): v for k, v in state.get("answers", {}).items()}
+            st.session_state.flagged_questions = set(state.get("flagged_questions", []))
+            st.session_state.current_question = state.get("current_question", 0)
+            st.session_state.started_at = state.get("started_at", time.time())
+            st.session_state.finished_at = None
+            st.session_state.finish_reason = None
+            st.session_state.attempt_id = None
+            st.session_state.persistence_error = None
+            st.session_state.firebase_error = None
+            return True
+        except Exception:
+            pass
+    return False
+
+
+def clear_active_test():
+    if not st.session_state.get("user"):
+        return
+    user_id = st.session_state.user["id"]
+    file_path = f"data/active_test_{user_id}.json"
+    if os.path.exists(file_path):
+        try:
+            os.remove(file_path)
+        except Exception:
+            pass
+
+
 def set_authenticated_user(user):
     st.session_state.user = user
-    st.session_state.screen = "dashboard"
+    if load_active_test():
+        st.session_state.screen = "exam"
+    else:
+        st.session_state.screen = "dashboard"
     st.session_state.login_failures = 0
     st.session_state.login_locked_until = 0
 
@@ -535,6 +700,7 @@ def finish_test(reason="submitted"):
     st.session_state.finished_at = time.time()
     st.session_state.finish_reason = reason
     persist_current_attempt()
+    clear_active_test()
     st.session_state.screen = "results"
 
 
@@ -613,42 +779,60 @@ def get_explanation(question):
 
 
 def answer_status(user_answer, correct_answer, is_correct=None):
+    lang = get_lang()
     if user_answer is None:
-        return "Kosong", "status-empty"
+        return ("Empty" if lang == "en" else "Kosong"), "status-empty"
     if is_correct is None:
         is_correct = user_answer == correct_answer
     if bool(is_correct):
-        return "Benar", "status-good"
-    return "Salah", "status-bad"
+        return ("Correct" if lang == "en" else "Benar"), "status-good"
+    return ("Wrong" if lang == "en" else "Salah"), "status-bad"
 
 
 def format_answer_value(value):
+    lang = get_lang()
     if value is None:
-        return "Tidak dijawab"
+        return "Not answered" if lang == "en" else "Tidak dijawab"
     if value == "":
-        return "(opsi kosong)"
+        return "(empty option)" if lang == "en" else "(opsi kosong)"
     return str(value)
 
 
 def build_current_review_items():
     review_items = []
+    lang = get_lang()
     for index, question_data in enumerate(st.session_state.test_questions):
         question = question_data["item"]
-        user_answer = st.session_state.answers.get(index)
+        # Use language-aware fields
+        q = q_text(question, "q")
+        options = q_text(question, "options") if isinstance(q_text(question, "options"), list) else question.get("options", [])
+        correct_answer = q_text(question, "answer")
+        user_answer_raw = st.session_state.answers.get(index)
+        # Map user_answer from ID answer to EN answer for display
+        if lang == "en" and user_answer_raw is not None:
+            id_options = question.get("options", [])
+            en_options = question.get("options_en", id_options)
+            try:
+                idx = id_options.index(user_answer_raw)
+                user_answer = en_options[idx]
+            except (ValueError, IndexError):
+                user_answer = user_answer_raw
+        else:
+            user_answer = user_answer_raw
         review_items.append(
             {
                 "position": index + 1,
                 "section": question_data["section_label"],
                 "concept": question.get("concept"),
                 "difficulty": question.get("difficulty"),
-                "question": question["q"],
+                "question": q,
                 "code": question.get("code"),
                 "language": question.get("language", "swift"),
-                "options": question.get("options", []),
+                "options": options,
                 "user_answer": user_answer,
-                "correct_answer": question["answer"],
-                "is_correct": user_answer == question["answer"],
-                "explanation": get_explanation(question),
+                "correct_answer": correct_answer,
+                "is_correct": user_answer_raw == question["answer"],
+                "explanation": q_text(question, "explanation") if question.get("explanation") else get_explanation(question),
             }
         )
     return review_items
@@ -664,14 +848,16 @@ def render_answer_options(options, user_answer, correct_answer):
         tags = []
         if option == correct_answer:
             classes.append("correct")
-            tags.append('<span class="option-tag correct">Kunci</span>')
+            key_label = "Answer Key" if get_lang() == "en" else "Kunci"
+            tags.append(f'<span class="option-tag correct">{key_label}</span>')
         if user_answer is not None and option == user_answer:
             classes.append("selected")
+            your_label = "Your Answer" if get_lang() == "en" else "Jawaban Anda"
             if option != correct_answer:
                 classes.append("wrong")
-                tags.append('<span class="option-tag wrong">Jawaban Anda</span>')
+                tags.append(f'<span class="option-tag wrong">{your_label}</span>')
             else:
-                tags.append('<span class="option-tag correct">Jawaban Anda</span>')
+                tags.append(f'<span class="option-tag correct">{your_label}</span>')
         tag_markup = (
             f'<div class="option-tags">{"".join(tags)}</div>' if tags else ""
         )
@@ -691,9 +877,16 @@ def render_answer_options(options, user_answer, correct_answer):
 
 
 def render_answer_review(review_items, filter_key):
+    lang = get_lang()
+    if lang == "en":
+        filter_options = ["All", "Wrong", "Correct", "Empty"]
+        filter_all = "All"
+    else:
+        filter_options = ["Semua", "Salah", "Benar", "Kosong"]
+        filter_all = "Semua"
     review_filter = st.radio(
         "Filter review",
-        ["Semua", "Salah", "Benar", "Kosong"],
+        filter_options,
         index=0,
         horizontal=True,
         label_visibility="collapsed",
@@ -708,7 +901,7 @@ def render_answer_review(review_items, filter_key):
             user_answer, correct_answer, item.get("is_correct")
         )
 
-        if review_filter != "Semua" and review_filter != status:
+        if review_filter != filter_all and review_filter != status:
             continue
 
         visible_count += 1
@@ -920,6 +1113,8 @@ def render_auth():
                             st.error(error)
                         else:
                             set_authenticated_user(user)
+                            # Auto remember on registration
+                            set_remember_token(create_remember_token(user["id"]))
                             try_sync_local_user_to_firebase(user)
                             st.rerun()
                 st.markdown(
@@ -1197,7 +1392,7 @@ def render_intro():
             jawaban beserta pembahasannya setelah tes selesai.
         </p>
         <div class="info-strip">
-            <div class="info-item"><div class="info-value">100 soal</div><div class="info-label">25 soal analisis pseudocode</div></div>
+            <div class="info-item"><div class="info-value">100 soal</div><div class="info-label">15 soal analisis pseudocode, 20 soal logika</div></div>
             <div class="info-item"><div class="info-value">120 menit</div><div class="info-label">Timer berjalan setelah tes dimulai</div></div>
             <div class="info-item"><div class="info-value">75%</div><div class="info-label">Target nilai latihan</div></div>
         </div>
@@ -1239,7 +1434,7 @@ def render_timer():
     st.markdown(
         f"""
         <div class="timer-card{danger_class}" role="timer" aria-live="polite">
-            <div class="timer-label">Sisa waktu</div>
+            <div class="timer-label">{t('timer_label')}</div>
             <div class="timer-value">{format_duration(remaining)}</div>
         </div>
         """,
@@ -1267,7 +1462,7 @@ def confirm_finish_dialog():
         if st.button("Lanjut Mengerjakan", width="stretch"):
             st.rerun()
     with right:
-        if st.button("Kumpulkan Jawaban", type="primary", width="stretch"):
+        if st.button(t("btn_submit"), type="primary", width="stretch"):
             finish_test()
             st.rerun()
 
@@ -1294,7 +1489,7 @@ def render_exam():
         st.markdown(
             f"""
             <div class="exam-name">Swift Programming Simulation Test</div>
-            <div class="exam-meta">Soal {current_index + 1} dari {total} &nbsp;·&nbsp; {answered} dijawab &nbsp;·&nbsp; {flagged_count} di-flag</div>
+            <div class="exam-meta">{t('soal_prefix')} {current_index + 1} {t('dari')} {total} &nbsp;·&nbsp; {answered} {t('dijawab')} &nbsp;·&nbsp; {flagged_count} {t('di_flag')}</div>
             """,
             unsafe_allow_html=True,
         )
@@ -1314,7 +1509,7 @@ def render_exam():
             meta_column, flag_column = st.columns([4, 1], vertical_alignment="center")
             with meta_column:
                 st.markdown(
-                    f'<div class="question-meta">{question_data["section_label"]} · Soal {question_data["section_number"]}</div>',
+                    f'<div class="question-meta">{question_data["section_label"]} · {t("soal_prefix")} {question_data["section_number"]}</div>',
                     unsafe_allow_html=True,
                 )
             with flag_column:
@@ -1333,14 +1528,14 @@ def render_exam():
                     unsafe_allow_html=True,
                 )
                 st.button(
-                    "Hapus Flag" if is_flagged else "Flag Soal",
+                    t("btn_unflag") if is_flagged else t("btn_flag"),
                     key="flag_current_question",
                     on_click=toggle_question_flag,
                     args=(current_index,),
                     width="stretch",
                     help="Tandai soal ini untuk ditinjau kembali",
                 )
-            st.markdown(f'<div class="question-title">{question["q"]}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="question-title">{html.escape(q_text(question, "q"))}</div>', unsafe_allow_html=True)
             if question.get("difficulty") or question.get("concept"):
                 badges = "".join(
                     f'<span class="code-badge">{value}</span>'
@@ -1354,24 +1549,38 @@ def render_exam():
                     language=question.get("language", "swift"),
                     line_numbers=True,
                 )
-            st.markdown('<div class="choice-label">Pilih satu jawaban</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="choice-label">{t("choice_label")}</div>', unsafe_allow_html=True)
 
             widget_key = f"answer_{st.session_state.test_id}_{current_index}"
             current_answer = st.session_state.answers.get(current_index)
-            default_index = question["options"].index(current_answer) if current_answer in question["options"] else None
+            # Get active-language options for display
+            display_options = q_text(question, "options") if isinstance(q_text(question, "options"), list) else question.get("options", [])
+            id_options = question.get("options", [])
+            en_options = question.get("options_en", id_options)
+            # Map stored ID-language answer to display-language for default_index
+            if current_answer is not None and get_lang() == "en" and current_answer in id_options:
+                display_current = en_options[id_options.index(current_answer)]
+            else:
+                display_current = current_answer
+            default_index = display_options.index(display_current) if display_current in display_options else None
             choice = st.radio(
-                "Pilih satu jawaban",
-                question["options"],
+                t("choice_label"),
+                display_options,
                 index=default_index,
                 key=widget_key,
                 label_visibility="collapsed",
             )
             if choice is not None:
-                st.session_state.answers[current_index] = choice
+                # Store answer in ID language (for scoring against ID answer)
+                if get_lang() == "en" and choice in en_options:
+                    stored_answer = id_options[en_options.index(choice)]
+                else:
+                    stored_answer = choice
+                st.session_state.answers[current_index] = stored_answer
 
             if current_index in st.session_state.answers:
                 st.button(
-                    "Kosongkan jawaban",
+                    t("btn_clear"),
                     type="tertiary",
                     on_click=clear_answer,
                     args=(current_index, widget_key),
@@ -1381,7 +1590,7 @@ def render_exam():
         previous, spacer, next_column = st.columns([1, 1.4, 1])
         with previous:
             st.button(
-                "Sebelumnya",
+                t("btn_prev"),
                 disabled=current_index == 0,
                 on_click=move_question,
                 args=(-1,),
@@ -1390,30 +1599,44 @@ def render_exam():
         with next_column:
             if current_index < total - 1:
                 st.button(
-                    "Berikutnya",
+                    t("btn_next"),
                     type="primary",
                     on_click=move_question,
                     args=(1,),
                     width="stretch",
                 )
             else:
-                if st.button("Selesaikan Tes", type="primary", width="stretch"):
+                if st.button(t("btn_finish"), type="primary", width="stretch"):
                     confirm_finish_dialog()
 
     with palette:
         with st.container(key="question_palette", border=True):
-            st.markdown('<div class="palette-title">Navigasi soal</div>', unsafe_allow_html=True)
+            # ── Language switcher ──────────────────────────────────────
+            lang = get_lang()
+            lang_cols = st.columns(2)
+            with lang_cols[0]:
+                if st.button("🇮🇩 ID", key="lang_id", use_container_width=True,
+                             type="primary" if lang == "id" else "secondary"):
+                    st.session_state.ui_lang = "id"
+                    st.rerun()
+            with lang_cols[1]:
+                if st.button("🇬🇧 EN", key="lang_en", use_container_width=True,
+                             type="primary" if lang == "en" else "secondary"):
+                    st.session_state.ui_lang = "en"
+                    st.rerun()
+
+            st.markdown(f'<div class="palette-title">{t("nav_title")}</div>', unsafe_allow_html=True)
             st.markdown(
-                '<div class="palette-copy">Gunakan warna untuk melihat status setiap soal.</div>',
+                f'<div class="palette-copy">{t("nav_copy")}</div>',
                 unsafe_allow_html=True,
             )
             st.markdown(
-                """
-                <div class="palette-legend" aria-label="Keterangan status soal">
-                    <div class="legend-item"><span class="legend-swatch legend-active"></span>Aktif</div>
-                    <div class="legend-item"><span class="legend-swatch legend-flagged"></span>Di-flag</div>
-                    <div class="legend-item"><span class="legend-swatch legend-answered"></span>Terjawab</div>
-                    <div class="legend-item"><span class="legend-swatch legend-empty"></span>Belum dijawab</div>
+                f"""
+                <div class="palette-legend" aria-label="{t('nav_title')}">
+                    <div class="legend-item"><span class="legend-swatch legend-active"></span>{t('legend_active')}</div>
+                    <div class="legend-item"><span class="legend-swatch legend-flagged"></span>{t('legend_flagged')}</div>
+                    <div class="legend-item"><span class="legend-swatch legend-answered"></span>{t('legend_answered')}</div>
+                    <div class="legend-item"><span class="legend-swatch legend-empty"></span>{t('legend_empty')}</div>
                 </div>
                 """,
                 unsafe_allow_html=True,
@@ -1424,37 +1647,60 @@ def render_exam():
             for index, data in enumerate(st.session_state.test_questions):
                 grouped_indices[data["section_label"]].append(index)
 
+            if "palette_collapsed" not in st.session_state:
+                st.session_state.palette_collapsed = {}
+
             for section_label, indices in grouped_indices.items():
-                st.markdown(f'<div class="palette-section">{section_label}</div>', unsafe_allow_html=True)
-                for row_start in range(0, len(indices), 4):
-                    row_indices = indices[row_start : row_start + 4]
-                    columns = st.columns(4)
-                    for column, index in zip(columns, row_indices):
-                        label = f"{index + 1}"
-                        if index == current_index:
-                            status_text = "aktif"
-                            if index in st.session_state.flagged_questions:
-                                status_text += " dan di-flag"
-                        elif index in st.session_state.flagged_questions:
-                            status_text = "di-flag untuk ditinjau"
-                        elif index in st.session_state.answers:
-                            status_text = "sudah dijawab"
-                        else:
-                            status_text = "belum dijawab"
-                        with column:
-                            st.button(
-                                label,
-                                key=f"nav_{st.session_state.test_id}_{index}",
-                                type="primary" if index == current_index else "secondary",
-                                on_click=go_to_question,
-                                args=(index,),
-                                width="stretch",
-                                help=f"Soal {index + 1}: {status_text}",
-                            )
+                is_collapsed = st.session_state.palette_collapsed.get(section_label, False)
+                toggle_icon = t("expand") if is_collapsed else t("collapse")
+                if st.button(
+                    f"{section_label}  {toggle_icon}",
+                    key=f"sec_toggle_{section_label}",
+                    use_container_width=True,
+                    type="secondary",
+                ):
+                    st.session_state.palette_collapsed[section_label] = not is_collapsed
+                    st.rerun()
+                st.markdown(
+                    f"<style>.st-key-sec_toggle_{section_label.replace(' ', '_').replace('&', 'amp')} button"
+                    "{ text-align:left!important; font-size:.7rem!important; min-height:32px!important;"
+                    " padding:.3rem .6rem!important; font-weight:750!important;"
+                    " color:var(--muted)!important; justify-content:space-between!important; }</style>",
+                    unsafe_allow_html=True,
+                )
+
+                if not is_collapsed:
+                    for row_start in range(0, len(indices), 4):
+                        row_indices = indices[row_start : row_start + 4]
+                        columns = st.columns(4)
+                        for column, index in zip(columns, row_indices):
+                            label = f"{index + 1}"
+                            if index == current_index:
+                                status_text = t("status_active")
+                                if index in st.session_state.flagged_questions:
+                                    status_text = t("status_active_and_flagged")
+                            elif index in st.session_state.flagged_questions:
+                                status_text = t("status_flagged")
+                            elif index in st.session_state.answers:
+                                status_text = t("status_answered")
+                            else:
+                                status_text = t("status_unanswered")
+                            with column:
+                                st.button(
+                                    label,
+                                    key=f"nav_{st.session_state.test_id}_{index}",
+                                    type="primary" if index == current_index else "secondary",
+                                    on_click=go_to_question,
+                                    args=(index,),
+                                    width="stretch",
+                                    help=f"{t('soal_prefix')} {index + 1}: {status_text}",
+                                )
 
             st.divider()
-            if st.button("Kumpulkan Jawaban", width="stretch"):
+            if st.button(t("btn_submit"), width="stretch"):
                 confirm_finish_dialog()
+
+    save_active_test()
 
 
 def render_results():
@@ -1553,9 +1799,6 @@ def render_results():
         filter_key=f"review_filter_{st.session_state.test_id}",
     )
 
-
-initialize_storage()
-
 bank_errors = validate_question_bank()
 if bank_errors:
     st.error("Bank soal belum valid:\n- " + "\n- ".join(bank_errors))
@@ -1563,10 +1806,19 @@ if bank_errors:
 
 if "user" not in st.session_state:
     st.session_state.user = None
-if "screen" not in st.session_state:
-    st.session_state.screen = "dashboard" if st.session_state.user else "auth"
+
 if not st.session_state.user:
     restore_remembered_user()
+
+if "screen" not in st.session_state:
+    if st.session_state.user:
+        if load_active_test():
+            st.session_state.screen = "exam"
+        else:
+            st.session_state.screen = "dashboard"
+    else:
+        st.session_state.screen = "auth"
+
 if not st.session_state.user:
     st.session_state.screen = "auth"
 
