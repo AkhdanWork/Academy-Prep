@@ -1576,16 +1576,10 @@ def render_exam():
                     stored_answer = choice
                 st.session_state.answers[current_index] = stored_answer
 
-            if current_index in st.session_state.answers:
-                st.button(
-                    t("btn_clear"),
-                    type="tertiary",
-                    on_click=clear_answer,
-                    args=(current_index, widget_key),
-                )
+
 
         st.write("")
-        previous, spacer, next_column = st.columns([1, 1.4, 1])
+        previous, clear_col, next_column = st.columns([1, 1.4, 1])
         with previous:
             st.button(
                 t("btn_prev"),
@@ -1594,6 +1588,36 @@ def render_exam():
                 args=(-1,),
                 width="stretch",
             )
+        with clear_col:
+            if current_index in st.session_state.answers:
+                st.markdown(
+                    """
+                    <style>
+                    .st-key-clear_answer_nav button {
+                        width: 100%;
+                        background: transparent !important;
+                        border: 1px solid #354052 !important;
+                        color: #9ba8b8 !important;
+                        font-size: .8rem !important;
+                        min-height: 44px;
+                        border-radius: 11px;
+                        transition: border-color 180ms ease, color 180ms ease;
+                    }
+                    .st-key-clear_answer_nav button:hover {
+                        border-color: #ff7185 !important;
+                        color: #ff7185 !important;
+                    }
+                    </style>
+                    """,
+                    unsafe_allow_html=True,
+                )
+                st.button(
+                    t("btn_clear"),
+                    key="clear_answer_nav",
+                    on_click=clear_answer,
+                    args=(current_index, widget_key),
+                    width="stretch",
+                )
         with next_column:
             if current_index < total - 1:
                 st.button(
