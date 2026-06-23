@@ -478,6 +478,7 @@ def start_test():
     st.session_state.attempt_id = None
     st.session_state.persistence_error = None
     st.session_state.firebase_error = None
+    st.session_state.clear_counts = {}
     st.session_state.screen = "exam"
 
 
@@ -731,6 +732,9 @@ def move_question(offset):
 def clear_answer(index, widget_key):
     st.session_state.answers.pop(index, None)
     st.session_state.pop(widget_key, None)
+    if "clear_counts" not in st.session_state:
+        st.session_state.clear_counts = {}
+    st.session_state.clear_counts[index] = st.session_state.clear_counts.get(index, 0) + 1
 
 
 def toggle_question_flag(index):
@@ -1562,7 +1566,8 @@ def render_exam():
                 )
             st.markdown(f'<div class="choice-label">{t("choice_label")}</div>', unsafe_allow_html=True)
 
-            widget_key = f"answer_{st.session_state.test_id}_{current_index}"
+            clear_count = st.session_state.get("clear_counts", {}).get(current_index, 0)
+            widget_key = f"answer_{st.session_state.test_id}_{current_index}_{clear_count}"
             current_answer = st.session_state.answers.get(current_index)
             # Get active-language options for display
             display_options = q_text(question, "options") if isinstance(q_text(question, "options"), list) else question.get("options", [])
