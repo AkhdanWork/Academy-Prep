@@ -339,6 +339,19 @@ st.markdown(
         .stButton > button { min-height: 44px; border-radius: 11px; font-weight: 680; cursor: pointer; }
         .stButton > button:focus-visible { outline: 3px solid rgba(255, 90, 98, .35); outline-offset: 2px; }
 
+        .st-key-clear_answer_nav button {
+            width: 100%;
+            background: transparent !important;
+            border: 1px solid rgba(255, 113, 133, .55) !important;
+            color: #ff7185 !important;
+            font-size: .85rem !important;
+            transition: border-color 180ms ease, background 180ms ease;
+        }
+        .st-key-clear_answer_nav button:hover {
+            background: rgba(255, 113, 133, .1) !important;
+            border-color: #ff7185 !important;
+        }
+
         .result-hero {
             border: 1px solid var(--border); border-radius: 22px; padding: clamp(1.4rem, 4vw, 2.3rem);
             background: linear-gradient(135deg, #171f2b, #111720); margin-bottom: 1.2rem;
@@ -1590,34 +1603,13 @@ def render_exam():
             )
         with clear_col:
             if current_index in st.session_state.answers:
-                st.markdown(
-                    """
-                    <style>
-                    .st-key-clear_answer_nav button {
-                        width: 100%;
-                        background: transparent !important;
-                        border: 1px solid #354052 !important;
-                        color: #9ba8b8 !important;
-                        font-size: .8rem !important;
-                        min-height: 44px;
-                        border-radius: 11px;
-                        transition: border-color 180ms ease, color 180ms ease;
-                    }
-                    .st-key-clear_answer_nav button:hover {
-                        border-color: #ff7185 !important;
-                        color: #ff7185 !important;
-                    }
-                    </style>
-                    """,
-                    unsafe_allow_html=True,
-                )
-                st.button(
+                if st.button(
                     t("btn_clear"),
                     key="clear_answer_nav",
-                    on_click=clear_answer,
-                    args=(current_index, widget_key),
                     width="stretch",
-                )
+                ):
+                    clear_answer(current_index, widget_key)
+                    st.rerun()
         with next_column:
             if current_index < total - 1:
                 st.button(
