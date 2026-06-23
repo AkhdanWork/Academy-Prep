@@ -870,9 +870,8 @@ def render_answer_options(options, user_answer, correct_answer):
             """
         )
 
-    st.markdown(
-        f'<div class="answer-options">{"".join(option_blocks)}</div>',
-        unsafe_allow_html=True,
+    st.html(
+        f'<div class="answer-options">{"".join(option_blocks)}</div>'
     )
 
 
@@ -918,9 +917,8 @@ def render_answer_review(review_items, filter_key):
                 if value
             ]
             meta = " &middot; ".join(meta_parts)
-            st.markdown(
-                f'<div class="question-meta">{meta} &middot; <span class="{status_class}">{status}</span></div>',
-                unsafe_allow_html=True,
+            st.html(
+                f'<div class="question-meta">{meta} &middot; <span class="{status_class}">{status}</span></div>'
             )
             if item.get("code"):
                 st.code(
@@ -935,37 +933,37 @@ def render_answer_review(review_items, filter_key):
 
             answer_columns = st.columns(2)
             with answer_columns[0]:
-                answer_class = "correct" if status == "Benar" else "wrong"
-                st.markdown(
+                answer_class = "correct" if status in ("Benar", "Correct") else "wrong"
+                user_label = "Your Answer" if get_lang() == "en" else "Jawaban Anda"
+                st.html(
                     f"""
                     <div class="answer-box {answer_class}">
-                        <div class="answer-label">Jawaban Anda</div>
+                        <div class="answer-label">{user_label}</div>
                         <div class="answer-value">{html.escape(format_answer_value(user_answer))}</div>
                     </div>
-                    """,
-                    unsafe_allow_html=True,
+                    """
                 )
             with answer_columns[1]:
-                st.markdown(
+                correct_label = "Correct Answer" if get_lang() == "en" else "Jawaban benar"
+                st.html(
                     f"""
                     <div class="answer-box correct">
-                        <div class="answer-label">Jawaban benar</div>
+                        <div class="answer-label">{correct_label}</div>
                         <div class="answer-value">{html.escape(format_answer_value(correct_answer))}</div>
                     </div>
-                    """,
-                    unsafe_allow_html=True,
+                    """
                 )
 
             explanation = item.get("explanation")
             if explanation:
-                st.markdown(
+                explain_title = "How to answer" if get_lang() == "en" else "Cara menjawab"
+                st.html(
                     f"""
                     <div class="explanation">
-                        <div class="explanation-title">Cara menjawab</div>
+                        <div class="explanation-title">{explain_title}</div>
                         <div>{html.escape(str(explanation))}</div>
                     </div>
-                    """,
-                    unsafe_allow_html=True,
+                    """
                 )
 
     if visible_count == 0:
