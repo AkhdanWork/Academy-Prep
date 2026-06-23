@@ -50,12 +50,12 @@ st.set_page_config(
 
 TEST_DURATION_SECONDS = 120 * 60
 SECTION_CONFIG = {
-    "Section 1: Logic": {"label": "Logic", "quota": 20},
+    "Section 1: Logic": {"label": "Logic", "quota": 40},
     "Section 2: Programming (Swift Focus)": {"label": "Swift", "quota": 10},
     "Section 7: Pseudocode Analysis": {"label": "Analisis Pseudocode", "quota": 15},
-    "Section 6: Code Analysis": {"label": "Analisis Kode", "quota": 15},
-    "Section 5: Code Completion": {"label": "Lengkapi Kode", "quota": 15},
-    "Section 3: OOP": {"label": "OOP", "quota": 20},
+    "Section 6: Code Analysis": {"label": "Analisis Kode", "quota": 10},
+    "Section 5: Code Completion": {"label": "Lengkapi Kode", "quota": 10},
+    "Section 3: OOP": {"label": "OOP", "quota": 10},
     "Section 4: Bonus (Design/UX)": {"label": "Design & UX", "quota": 5},
 }
 
